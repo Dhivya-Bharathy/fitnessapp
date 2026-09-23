@@ -44,6 +44,7 @@ export default function EditProfileScreen() {
 
   const [units, setUnits] = useState<'metric' | 'imperial'>(profile?.units === 'imperial' ? 'imperial' : 'metric');
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
+  const [username, setUsername] = useState(profile?.calfit_id ?? '');
   const [bio, setBio] = useState((profile as any)?.bio ?? '');
   const [fitnessLevel, setFitnessLevel] = useState((profile as any)?.fitness_level ?? 'beginner');
   const [selectedGoals, setSelectedGoals] = useState<string[]>((profile as any)?.goals ?? []);
@@ -134,11 +135,17 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     if (!user?.id) return;
     if (!fullName.trim()) { Alert.alert('Missing Name', 'Please enter your full name.'); return; }
+    const calfit_id = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (calfit_id.length < 3) {
+      Alert.alert('Username', 'Use at least 3 characters (a–z, 0–9, underscore).');
+      return;
+    }
     setIsSaving(true);
     try {
       const { supabase } = await import('../../services/supabase');
       const updates: Record<string, any> = {
         full_name: fullName.trim(),
+        calfit_id,
         bio: bio.trim() || null,
         fitness_level: fitnessLevel,
         goals: selectedGoals,
@@ -201,6 +208,19 @@ export default function EditProfileScreen() {
             <Ionicons name="person-outline" size={18} color={theme.textMuted} />
             <TextInput value={fullName} onChangeText={setFullName} placeholder="Your full name" placeholderTextColor={theme.textMuted}
               style={[styles.input, { color: theme.textPrimary }]} autoCorrect={false} />
+          </View>
+
+          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Username</Text>
+          <View style={[styles.fieldWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="at-outline" size={18} color={theme.textMuted} />
+            <TextInput
+              value={username}
+              onChangeText={(t) => setUsername(t.replace(/[^a-z0-9_]/g, '').toLowerCase())}
+              placeholder="yourname"
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="none"
+              style={[styles.input, { color: theme.textPrimary }]}
+            />
           </View>
 
           {/* Bio */}

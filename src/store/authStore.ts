@@ -56,10 +56,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (!get().isOnboarding) {
-        const { isFitnessAssessmentComplete } = await import('../utils/onboardingFlags');
-        if (!profile || !isFitnessAssessmentComplete(profile)) {
-          set({ isOnboarding: true });
+        const { isAssessmentCompleteForUser, setLocalAssessmentComplete } = await import('../utils/onboardingFlags');
+        let complete = await isAssessmentCompleteForUser(userId, profile);
+        if (profile && !complete && profile.goal && profile.bio) {
+          await setLocalAssessmentComplete(userId);
+          complete = true;
         }
+        if (profile && !complete) {
+          set({ isOnboarding: true });
+        } else if (complete) {
+          set({ isOnboarding: false });
+        }
+        // If profile failed to load, keep current isOnboarding — do not kick user to Welcome.
       }
 
       return profile;
@@ -96,6 +104,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { supabase } = await import('../services/supabase');
       await supabase.auth.signOut();
+    } catch {}
+    try {
+      const { clearLocalAssessmentComplete } = await import('../utils/onboardingFlags');
+      await clearLocalAssessmentComplete();
     } catch {}
     set({ user: null, session: null, profile: null, isOnboarding: false, isAuthenticated: false, userTier: 'free', liveSteps: 0 });
   },

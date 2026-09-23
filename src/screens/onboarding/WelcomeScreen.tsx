@@ -2,23 +2,20 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  ScrollView,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { useIsCompactPhone } from '../../hooks/useLayoutWidth';
-import { useFooterInset } from '../../hooks/useFooterInset';
+import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
+import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const compact = useIsCompactPhone();
-  const footerPad = useFooterInset();
 
   const features = [
     { icon: 'nutrition-outline', text: 'Calories, water & Indian food search' },
@@ -28,62 +25,52 @@ export default function WelcomeScreen() {
   ];
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: footerPad + 100 }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.logoWrap}>
-          <View style={[styles.logoCircle, compact && styles.logoCircleCompact, {
-            backgroundColor: theme.accentDim as string,
-            borderColor: theme.accent,
-          }]}>
-            <Text style={[styles.logoLetter, compact && styles.logoLetterCompact, { color: theme.accent }]}>F</Text>
-          </View>
-          <Text style={[styles.logoText, compact && styles.logoTextCompact, { color: theme.textPrimary }]}>
-            FITNESS APP
-          </Text>
-          <Text style={[styles.logoSub, { color: theme.textSecondary }]}>
-            Your personal fitness & nutrition coach
-          </Text>
-        </View>
-
-        <View style={styles.features}>
-          {features.map((f) => (
-            <View key={f.text} style={[styles.featureRow, {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            }]}>
-              <View style={[styles.featureIcon, { backgroundColor: theme.accentDim as string }]}>
-                <Ionicons name={f.icon as any} size={22} color={theme.accent} />
-              </View>
-              <Text style={[styles.featureText, { color: theme.textPrimary }]}>{f.text}</Text>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-
-      <View style={[styles.footer, { backgroundColor: theme.bg, paddingBottom: footerPad }]}>
-        <TouchableOpacity
+    <StickyFooterLayout
+      backgroundColor={theme.bg}
+      footer={
+        <PrimaryCTA
+          label="Get Started"
           onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] })}
-          style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.primaryBtnText, { color: theme.bg }]}>Get Started</Text>
-        </TouchableOpacity>
-        <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
-          Answer 22 questions for your personalized plan.
+        />
+      }
+    >
+      <View style={styles.logoWrap}>
+        <View style={[styles.logoCircle, compact && styles.logoCircleCompact, {
+          backgroundColor: theme.accentDim as string,
+          borderColor: theme.accent,
+        }]}>
+          <Text style={[styles.logoLetter, compact && styles.logoLetterCompact, { color: theme.accent }]}>F</Text>
+        </View>
+        <Text style={[styles.logoText, compact && styles.logoTextCompact, { color: theme.textPrimary }]}>
+          FITNESS APP
+        </Text>
+        <Text style={[styles.logoSub, { color: theme.textSecondary }]}>
+          Your personal fitness & nutrition coach
         </Text>
       </View>
-    </AndroidSafeView>
+
+      <View style={styles.features}>
+        {features.map((f) => (
+          <View key={f.text} style={[styles.featureRow, {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }]}>
+            <View style={[styles.featureIcon, { backgroundColor: theme.accentDim as string }]}>
+              <Ionicons name={f.icon as any} size={22} color={theme.accent} />
+            </View>
+            <Text style={[styles.featureText, { color: theme.textPrimary }]}>{f.text}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
+        Answer 22 questions for your personalized plan.
+      </Text>
+    </StickyFooterLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  logoWrap: { alignItems: 'center', marginBottom: spacing.lg },
+  logoWrap: { alignItems: 'center', marginBottom: spacing.lg, paddingTop: spacing.sm },
   logoCircle: {
     width: 72, height: 72, borderRadius: 36,
     alignItems: 'center', justifyContent: 'center',
@@ -105,12 +92,5 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   featureText: { fontSize: fontSize.base, fontWeight: '500', flex: 1, lineHeight: 20 },
-  footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    paddingHorizontal: spacing.lg, paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.25)',
-  },
-  primaryBtn: { padding: 16, borderRadius: radius.lg, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  primaryBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
-  disclaimer: { textAlign: 'center', fontSize: fontSize.sm, marginTop: spacing.sm, lineHeight: 18 },
+  disclaimer: { textAlign: 'center', fontSize: fontSize.sm, marginTop: spacing.lg, lineHeight: 18 },
 });

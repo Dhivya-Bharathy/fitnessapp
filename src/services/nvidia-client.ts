@@ -1,35 +1,27 @@
 import { supabase } from './supabase';
 import { buildSystemPrompt, generateWorkoutPrompt, buildCoachChatSystemPrompt, generateMealPlanPrompt } from '../utils/ai-coach-prompts';
 import { extractJSON } from '../utils/json-parser';
-import type { GeneratedWorkout, GeneratedMealPlan, MealPlanParams, Exercise, WorkoutParams, ChatMessage } from '../types/ai-coach.types';
+import type { GeneratedWorkout, GeneratedMealPlan, MealPlanParams, Exercise, WorkoutParams } from '../types/ai-coach.types';
+import {
+  invokeOpenAiChat,
+  OPENAI_CHAT_MODEL,
+  OPENAI_VISION_MODEL,
+} from './openai-proxy';
 
-const MODEL = process.env.EXPO_PUBLIC_NVIDIA_MODEL || 'meta/llama-3.1-70b-instruct';
-const VISION_MODEL = process.env.EXPO_PUBLIC_NVIDIA_VISION_MODEL || 'meta/llama-3.2-90b-vision-instruct';
+const MODEL = OPENAI_CHAT_MODEL;
+const VISION_MODEL = OPENAI_VISION_MODEL;
 
 const MAX_RETRIES = 3;
 const BASE_DELAY = 1000;
 
 async function invokeAI(body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
   try {
-    const result = await supabase.functions.invoke('ai-proxy', { body });
-    if (result.error) {
-      let detail = result.error.message;
-      try {
-        const resp = result.response || (result.error as any).context;
-        if (resp?.status) detail += ` (status=${resp.status})`;
-        const cloned = resp?.clone?.();
-        if (cloned) {
-          const text = await cloned.text();
-          if (text) detail += ` body=${text.slice(0, 300)}`;
-        }
-      } catch {}
-      if (__DEV__) console.warn('[invokeAI] error detail:', detail);
-      return { data: null, error: detail };
-    }
-    return { data: result.data, error: null };
+    const data = await invokeOpenAiChat(body as Parameters<typeof invokeOpenAiChat>[0]);
+    return { data, error: null };
   } catch (e: any) {
-    if (__DEV__) console.warn('[invokeAI] exception:', e?.message);
-    return { data: null, error: e?.message ?? 'Network error' };
+    const detail = e?.message ?? 'Network error';
+    if (__DEV__) console.warn('[invokeAI]', detail);
+    return { data: null, error: detail };
   }
 }
 
@@ -412,6 +404,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
         ],
         temperature: 0.3,
         max_tokens: 1000,
+        response_format: { type: 'json_object' },
       });
 
       const latencyMs = Date.now() - startTime;

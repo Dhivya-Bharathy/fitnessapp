@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image,
+  View, Text, StyleSheet, TouchableOpacity, Pressable, TextInput, Image,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,20 +13,20 @@ import {
   ASSESSMENT_SECTION_IMAGES,
 } from '../../data/fitnessAssessmentQuestions';
 import { useAssessmentStore } from '../../store/assessmentStore';
-import { useFooterInset } from '../../hooks/useFooterInset';
 import { useIsCompactPhone } from '../../hooks/useLayoutWidth';
 import { loadPersistedAssessment, persistAssessmentIndex } from '../../utils/assessmentPersistence';
+import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
+import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
 
 export default function FitnessAssessmentScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
-  const footerInset = useFooterInset();
   const compact = useIsCompactPhone();
-  const footerSpace = footerInset + 88;
   const { answers, setAnswer, toggleMulti, hydrateAnswers } = useAssessmentStore();
   const [index, setIndex] = useState(0);
   const [hydrated, setHydrated] = useState(false);
+  const autoAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -49,7 +48,15 @@ export default function FitnessAssessmentScreen() {
   useEffect(() => {
     if (!hydrated) return;
     persistAssessmentIndex(index);
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
   }, [index, hydrated]);
+
+  useEffect(() => () => {
+    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
+  }, []);
 
   const q = FITNESS_ASSESSMENT_QUESTIONS[index];
   const progress = (index + 1) / ASSESSMENT_QUESTION_COUNT;
@@ -64,13 +71,28 @@ export default function FitnessAssessmentScreen() {
     return typeof val === 'string' && val.length > 0;
   }, [answers, q]);
 
-  const goNext = () => {
-    if (!canContinue && q.type !== 'text') return;
+  const goNext = useCallback(() => {
     if (index >= ASSESSMENT_QUESTION_COUNT - 1) {
       navigation.navigate('AssessmentResults');
       return;
     }
     setIndex((i) => i + 1);
+  }, [index, navigation]);
+
+  const handleContinue = useCallback(() => {
+    if (!canContinue && q.type !== 'text') return;
+    goNext();
+  }, [canContinue, q.type, goNext]);
+
+  const selectSingle = (id: string, value: string) => {
+    setAnswer(id, value);
+    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
+    autoAdvanceTimer.current = setTimeout(() => {
+      const latest = useAssessmentStore.getState().answers[id];
+      if (latest === value && FITNESS_ASSESSMENT_QUESTIONS[index]?.id === id) {
+        goNext();
+      }
+    }, 500);
   };
 
   const goBack = () => {
@@ -78,14 +100,37 @@ export default function FitnessAssessmentScreen() {
     else setIndex((i) => i - 1);
   };
 
+  const continueLabel = index >= ASSESSMENT_QUESTION_COUNT - 1 ? 'Generate my plan' : 'Continue';
+
+  const header = (
+    <>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.accent }]}>Fitness App</Text>
+        <Text style={[styles.headerStep, { color: theme.textMuted }]}>
+          {index + 1}/{ASSESSMENT_QUESTION_COUNT}
+        </Text>
+      </View>
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+        <LinearGradient
+          colors={[theme.accent, '#0DAE6C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.progressFill, { width: `${progress * 100}%` }]}
+        />
+      </View>
+    </>
+  );
+
   const renderWeekdays = () => (
     <View style={styles.weekRow}>
       {q.options?.map((opt) => {
         const selected = (answers[q.id] as string[] | undefined)?.includes(opt.value);
         return (
-          <TouchableOpacity
+          <Pressable
             key={opt.value}
-            activeOpacity={0.85}
             onPress={() => toggleMulti(q.id, opt.value)}
             style={[
               styles.dayChip,
@@ -99,7 +144,7 @@ export default function FitnessAssessmentScreen() {
             <Text style={[styles.dayChipText, { color: selected ? theme.bg : theme.textPrimary }]}>
               {opt.label}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         );
       })}
     </View>
@@ -128,17 +173,17 @@ export default function FitnessAssessmentScreen() {
           : answers[q.id] === opt.value;
 
       return (
-        <TouchableOpacity
+        <Pressable
           key={opt.value}
-          activeOpacity={0.85}
           onPress={() =>
-            q.type === 'multi' ? toggleMulti(q.id, opt.value) : setAnswer(q.id, opt.value)
+            q.type === 'multi' ? toggleMulti(q.id, opt.value) : selectSingle(q.id, opt.value)
           }
-          style={[
+          style={({ pressed }) => [
             styles.option,
             {
               backgroundColor: selected ? theme.accentDim as string : theme.card,
               borderColor: selected ? theme.accent : theme.border,
+              opacity: pressed ? 0.92 : 1,
             },
           ]}
         >
@@ -151,133 +196,102 @@ export default function FitnessAssessmentScreen() {
             {opt.label}
           </Text>
           {selected && <Ionicons name="checkmark-circle" size={22} color={theme.accent} />}
-        </TouchableOpacity>
+        </Pressable>
       );
     });
   };
 
   if (!hydrated) {
     return (
-      <AndroidSafeView backgroundColor={theme.bg} style={[styles.safe, styles.center]}>
-        <Text style={{ color: theme.textMuted }}>Loading your progress…</Text>
-      </AndroidSafeView>
+      <StickyFooterLayout backgroundColor={theme.bg} footer={null}>
+        <View style={styles.loadingWrap}>
+          <Text style={{ color: theme.textMuted }}>Loading your progress…</Text>
+        </View>
+      </StickyFooterLayout>
     );
   }
 
+  const showFooterContinue = q.type !== 'single';
+
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.accent }]}>Fitness App</Text>
-        <Text style={[styles.headerStep, { color: theme.textMuted }]}>
-          {index + 1}/{ASSESSMENT_QUESTION_COUNT}
-        </Text>
-      </View>
-
-      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-        <LinearGradient
-          colors={[theme.accent, '#0DAE6C']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.progressFill, { width: `${progress * 100}%` }]}
-        />
-      </View>
-
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: footerSpace }]} keyboardShouldPersistTaps="handled">
+    <StickyFooterLayout
+      backgroundColor={theme.bg}
+      header={header}
+      footer={
+        showFooterContinue ? (
+          <PrimaryCTA
+            label={continueLabel}
+            onPress={handleContinue}
+            disabled={!canContinue && q.type !== 'text'}
+          />
+        ) : (
+          <Text style={[styles.tapHint, { color: theme.textMuted }]}>
+            Tap an option to continue
+          </Text>
+        )
+      }
+    >
+      {!compact && (
         <View style={styles.heroWrap}>
           <Image source={{ uri: heroUri }} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient colors={['transparent', theme.bg]} style={styles.heroFade} />
-          <View style={styles.heroBadge}>
-            <Ionicons name="barbell-outline" size={14} color={theme.accent} />
-            <Text style={[styles.heroBadgeText, { color: theme.textPrimary }]}>AI training + Indian diet</Text>
-          </View>
         </View>
+      )}
 
-        <Text style={[styles.section, { color: theme.accent }]}>{q.section}</Text>
-        <Text style={[styles.question, compact && styles.questionCompact, { color: theme.textPrimary }]}>{q.question}</Text>
-        {q.subtitle ? (
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>{q.subtitle}</Text>
-        ) : null}
-        <View style={styles.optionsWrap}>{renderOptions()}</View>
-      </ScrollView>
-
-      <View style={[styles.footer, { backgroundColor: theme.bg, paddingBottom: footerInset, borderTopColor: theme.border }]}>
-        <TouchableOpacity
-          onPress={goNext}
-          disabled={!canContinue && q.type !== 'text'}
-          activeOpacity={0.85}
-          style={styles.ctaWrap}
-        >
-          <LinearGradient
-            colors={[theme.accent, '#0DAE6C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.cta, { opacity: !canContinue && q.type !== 'text' ? 0.45 : 1 }]}
-          >
-            <Text style={styles.ctaText}>
-              {index >= ASSESSMENT_QUESTION_COUNT - 1 ? 'Generate my plan →' : 'Continue →'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-    </AndroidSafeView>
+      <Text style={[styles.section, { color: theme.accent }]}>{q.section}</Text>
+      <Text style={[styles.question, compact && styles.questionCompact, { color: theme.textPrimary }]}>
+        {q.question}
+      </Text>
+      {q.subtitle ? (
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>{q.subtitle}</Text>
+      ) : null}
+      <View style={styles.optionsWrap}>{renderOptions()}</View>
+      {!canContinue && q.type !== 'text' && q.type !== 'single' ? (
+        <Text style={[styles.hint, { color: theme.textMuted }]}>Choose at least one option.</Text>
+      ) : null}
+    </StickyFooterLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  loadingWrap: { paddingVertical: spacing.xl, alignItems: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
   },
   headerTitle: { fontSize: fontSize.lg, fontWeight: '800' },
   headerStep: { fontSize: fontSize.sm, fontWeight: '600' },
-  progressTrack: { height: 5, marginHorizontal: spacing.lg, borderRadius: 3, overflow: 'hidden' },
+  progressTrack: { height: 4, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%' },
-  scroll: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
   heroWrap: {
-    height: 140, borderRadius: radius.xl, overflow: 'hidden', marginBottom: spacing.md,
-    marginTop: spacing.xs,
+    height: 112, borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.md, marginTop: spacing.xs,
   },
   heroImage: { width: '100%', height: '100%' },
   heroFade: { ...StyleSheet.absoluteFillObject },
-  heroBadge: {
-    position: 'absolute', bottom: 10, left: 12, flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-  },
-  heroBadgeText: { fontSize: fontSize.xs, fontWeight: '700' },
   section: { fontSize: fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: spacing.sm },
-  question: { fontSize: 24, fontWeight: '800', lineHeight: 30, marginBottom: spacing.sm },
-  questionCompact: { fontSize: 20, lineHeight: 26 },
-  subtitle: { fontSize: fontSize.base, marginBottom: spacing.lg, lineHeight: 22 },
+  question: { fontSize: 22, fontWeight: '800', lineHeight: 28, marginBottom: spacing.sm },
+  questionCompact: { fontSize: 19, lineHeight: 25 },
+  subtitle: { fontSize: fontSize.sm, marginBottom: spacing.md, lineHeight: 20 },
   optionsWrap: { gap: spacing.sm },
   option: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, minHeight: 56, gap: spacing.sm,
+    padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, minHeight: 52, gap: spacing.sm,
   },
   optionIconWrap: {
-    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
   },
   optionLabel: { fontSize: fontSize.base, fontWeight: '600', flex: 1, paddingRight: spacing.sm },
   weekRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
   dayChip: {
-    width: '13%', minWidth: 44, aspectRatio: 1, borderRadius: 14, borderWidth: 1.5,
+    width: '13%', minWidth: 42, aspectRatio: 1, borderRadius: 12, borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center',
   },
-  dayChipCompact: { minWidth: 40, borderRadius: 12 },
+  dayChipCompact: { minWidth: 38 },
   dayChipText: { fontSize: 11, fontWeight: '800' },
   textInput: {
-    minHeight: 100, borderWidth: 1.5, borderRadius: radius.lg,
+    minHeight: 96, borderWidth: 1.5, borderRadius: radius.lg,
     padding: spacing.md, fontSize: fontSize.base, textAlignVertical: 'top',
   },
-  footer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  ctaWrap: { borderRadius: 20, overflow: 'hidden' },
-  cta: { padding: 18, alignItems: 'center' },
-  ctaText: { color: '#fff', fontSize: fontSize.lg, fontWeight: '800' },
+  hint: { textAlign: 'center', fontSize: fontSize.sm, marginTop: spacing.lg },
+  tapHint: { textAlign: 'center', fontSize: fontSize.sm, fontWeight: '600', paddingVertical: spacing.sm },
 });

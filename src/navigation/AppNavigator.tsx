@@ -282,7 +282,8 @@ export default function AppNavigator() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const showAuth = !user || isOnboarding;
-  const navKey = (user && !isOnboarding) ? `authed-${user.id}` : 'guest';
+  // Stable key per user — avoid remounting the whole app when isOnboarding toggles.
+  const navKey = user?.id ?? 'guest';
 
   if (!authReady) {
     return (

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Image, Alert, ScrollView,
+  Image, Alert, ScrollView, Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,7 +45,7 @@ export default function FoodScannerScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      quality: 0.5,
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
@@ -74,14 +74,24 @@ export default function FoodScannerScreen() {
   };
 
   const handleScan = async () => {
-    if (!imageBase64 || !user) return;
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to scan food.');
+      return;
+    }
+    if (!imageBase64) {
+      Alert.alert('No image', 'Choose a photo from your gallery first.');
+      return;
+    }
     setIsScanning(true);
     try {
       const data = await scanFoodImage(user.id, imageBase64);
       if (data && data.items.length > 0) {
         setResults(data.items);
       } else {
-        Alert.alert('No food detected', 'Could not identify any food items. Try a clearer photo.');
+        Alert.alert(
+          'Scan unavailable',
+          'Could not analyze this photo. On your PC run npm run proxy:ai, keep Expo running, and ensure EXPO_PUBLIC_ASSESSMENT_PROXY_URL points to your PC IP:8787 on phone.',
+        );
       }
     } catch {
       Alert.alert('Scan failed', 'Something went wrong. Please try again.');
@@ -219,6 +229,20 @@ export default function FoodScannerScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        ) : Platform.OS === 'web' ? (
+          <View style={styles.captureContainer}>
+            <View style={[styles.cameraBox, styles.webPickBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Ionicons name="restaurant-outline" size={48} color={theme.accent} />
+              <Text style={[styles.webPickTitle, { color: theme.textPrimary }]}>Scan from photo</Text>
+              <Text style={[styles.webPickSub, { color: theme.textSecondary }]}>
+                On mobile browser, use a clear food photo from your gallery. AI runs through the same proxy as your fitness plan.
+              </Text>
+              <TouchableOpacity onPress={pickImage} style={[styles.webPickBtn, { backgroundColor: theme.accent }]}>
+                <Ionicons name="images-outline" size={22} color="#fff" />
+                <Text style={styles.webPickBtnText}>Choose photo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : (
           <View style={styles.captureContainer}>
             <View style={styles.cameraBox}>
@@ -277,6 +301,27 @@ const styles = StyleSheet.create({
   // Capture mode
   captureContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },
   cameraBox: { height: 360, borderRadius: radius.xl, overflow: 'hidden', marginBottom: spacing.xl },
+  webPickBox: {
+    height: 'auto',
+    minHeight: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    borderWidth: 1,
+    gap: spacing.md,
+  },
+  webPickTitle: { fontSize: fontSize.xl, fontWeight: '800', textAlign: 'center' },
+  webPickSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
+  webPickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    marginTop: spacing.sm,
+  },
+  webPickBtnText: { color: '#fff', fontWeight: '700', fontSize: fontSize.base },
   camera: { flex: 1 },
   captureActions: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingBottom: 40 },
   captureBtn: { alignItems: 'center', gap: spacing.sm, borderRadius: radius.lg, borderWidth: 1, padding: spacing.md },

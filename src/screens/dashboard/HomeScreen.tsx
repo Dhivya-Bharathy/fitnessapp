@@ -436,7 +436,7 @@ function HomeStreaksSection({ theme, streakCount }: { theme: typeof colors.light
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { user, profile } = useAuthStore();
+  const { user, profile, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
 
   // Steps Tracker from Zustand Authstore state
@@ -462,14 +462,23 @@ export default function HomeScreen() {
   const loadData = async () => {
     if (!user?.id) return;
     try {
-      const [cal, water, sleepRes, notifRes] = await Promise.all([
+      const { localDateIso } = await import('../../utils/localDate');
+      const today = localDateIso();
+      const [cal, water, sleepRes, notifRes, profileRes] = await Promise.all([
         getTodayCalories(user.id),
         getTodayWater(user.id),
         supabase.from('sleep_logs').select('hours').eq('user_id', user.id)
-          .eq('date', new Date().toISOString().split('T')[0]).maybeSingle(),
+          .eq('date', today).maybeSingle(),
         supabase.from('notifications').select('id', { count: 'exact' })
           .eq('user_id', user.id).eq('read', false),
+        supabase.from('profiles')
+          .select('streak_count,last_active_date,full_name,calfit_id')
+          .eq('id', user.id)
+          .maybeSingle(),
       ]);
+      if (profileRes.data) {
+        updateProfile(profileRes.data);
+      }
       setCaloriesConsumed(cal);
       setWaterMl(water);
       setSleepHrs(sleepRes.data?.hours ?? 0);

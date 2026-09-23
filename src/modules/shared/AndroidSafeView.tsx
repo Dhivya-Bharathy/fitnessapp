@@ -18,9 +18,9 @@ export function AndroidSafeView({ children, style, backgroundColor }: Props) {
           {
             flex: 1,
             backgroundColor,
-            overflow: 'hidden',
+            minHeight: '100dvh' as unknown as number,
+            maxHeight: '100dvh' as unknown as number,
             paddingTop: 'env(safe-area-inset-top)' as unknown as number,
-            paddingBottom: 'env(safe-area-inset-bottom)' as unknown as number,
           },
           style,
         ]}

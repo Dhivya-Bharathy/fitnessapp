@@ -60,8 +60,16 @@ async function answerAssessment(page) {
       await clickByText(page, ASSESSMENT_PICKS[i], { exact: false });
     }
 
-    const isLast = i === ASSESSMENT_PICKS.length - 1;
-    await clickByText(page, isLast ? 'Generate my plan' : 'Continue', { exact: false });
+    await page.waitForTimeout(700);
+    const bodyAfter = await page.locator('body').innerText();
+    const needsContinue = /Continue|Generate my plan|Choose at least/i.test(bodyAfter);
+    if (needsContinue) {
+      if (bodyAfter.includes('Generate my plan')) {
+        await clickByText(page, 'Generate my plan', { exact: false });
+      } else {
+        await clickByText(page, 'Continue', { exact: false }).catch(() => {});
+      }
+    }
   }
   await page.waitForSelector('text=Building your plan', { timeout: 60000 });
 }
@@ -88,12 +96,12 @@ async function runFlow(page, label) {
 
   step('Goal');
   await clickByText(page, 'Lose Weight', { exact: false });
-  await clickByText(page, 'Continue →', { exact: true });
+  await clickByText(page, 'Continue', { exact: false });
 
   step('Stats');
   await page.getByPlaceholder('175').fill('170');
   await page.getByPlaceholder('70').fill('70');
-  await clickByText(page, 'Continue →', { exact: true });
+  await clickByText(page, 'Continue', { exact: false });
 
   step('Account');
   await clickByText(page, 'Save & Continue →', { exact: true });

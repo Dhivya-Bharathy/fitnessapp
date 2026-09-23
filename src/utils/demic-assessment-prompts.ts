@@ -24,19 +24,19 @@ Output ONLY valid JSON matching the requested schema.`;
 }
 
 export function buildDemicAssessmentUserPrompt(answers: AssessmentAnswers): string {
-  return `Client intake (all questions answered):
+  return `Client intake — use EVERY field below; do not ignore injuries, diet_type, indian_meals, budget_inr, days_per_week (weekday list), equipment, training_focus, or avoid_foods.
 
 ${formatAnswers(answers)}
 
-Create a personalized plan:
+Create a deeply personalized plan (not generic):
 
-1) **workout** — Session for their level, equipment, injuries, and training days. Include warmup, 5–8 main exercises, cooldown, and motivating ai_notes (no brand names).
+1) **workout** — Match primary_goal, experience, pullups/pushups level, session_minutes, training_place, equipment, injuries, and training_focus. Exercises must be feasible with their equipment (e.g. gym vs home). Include warmup, 5–8 main exercises, cooldown, ai_notes referencing their goals (no brand names).
 
-2) **indian_diet_plan** — One day of Indian meals (breakfast, lunch, dinner, optional snack) with realistic home options, macros estimate, and ₹ budget alignment.
+2) **indian_diet_plan** — Match diet_type, indian_meals preferences, meals_per_day, budget_inr, cooking, avoid_foods, and water_liters. Use specific Indian dishes they would eat (region preferences). Realistic calories for their goal (fat loss vs muscle).
 
-3) **weekly_outline** — Array of ${trainingDaysCount(answers)} short strings describing each training day focus (use their selected weekdays when provided).
+3) **weekly_outline** — Exactly ${trainingDaysCount(answers)} entries aligned with their selected training days (days_per_week). Each line names focus for that day.
 
-4) **coach_summary** — 2–3 warm, motivational sentences tying AI training + Indian diet together. No influencer or brand references.
+4) **coach_summary** — 2–3 sentences referencing their actual goals, schedule, and diet choices from the intake. Motivational, specific, not generic.
 
 JSON schema:
 {

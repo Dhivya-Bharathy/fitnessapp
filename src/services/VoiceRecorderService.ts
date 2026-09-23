@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
-import { supabase } from './supabase';
+import { transcribeAudioViaOpenAi } from './openai-proxy';
 
 let recording: Audio.Recording | null = null;
 
@@ -50,23 +50,11 @@ export const cancelRecording = async (): Promise<void> => {
   } catch { recording = null; }
 };
 
-/** Transcribes an audio file using Deepgram speech-to-text via Supabase Edge Function proxy. @param uri - The file URI of the audio recording. @returns The transcribed text, or null on failure. */
+/** Transcribes an audio file using OpenAI Whisper via local/Netlify proxy. */
 export const transcribeAudio = async (uri: string): Promise<string | null> => {
   try {
     const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-
-    const { data, error } = await supabase.functions.invoke('deepgram-proxy', {
-      body: { audioBase64: base64, mimeType: 'audio/m4a' },
-    });
-
-    if (error) {
-      if (__DEV__) console.error('Deepgram proxy error:', error);
-      return null;
-    }
-
-    const transcript = data?.transcript?.trim();
-    return transcript || null;
-
+    return transcribeAudioViaOpenAi(base64, 'audio/m4a');
   } catch (e) {
     if (__DEV__) console.error('transcribeAudio error:', e);
     return null;

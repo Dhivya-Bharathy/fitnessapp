@@ -18,6 +18,8 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { UserAvatar } from '../../modules/shared/UserAvatar';
 import { supabase } from '../../services/supabase';
 import { MilestoneCelebration, checkStreakMilestone, Milestone } from '../../components/MilestoneCelebration';
+import { localDateIso, previousLocalDateIso } from '../../utils/localDate';
+import { getProfile } from '../../services/profileService';
 
 const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';
@@ -112,10 +114,11 @@ export default function StreaksScreen() {
   const { user, profile, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const streak         = (profile as any)?.streak_count ?? 0;
-  const today          = new Date().toISOString().split('T')[0];
-  const alreadyChecked = (profile as any)?.last_active_date === today;
-  const hasFreezeThisWeek = (profile as any)?.streak_freeze_used_week === today?.slice(0, 7);
+  const streak         = profile?.streak_count ?? 0;
+  const today          = localDateIso();
+  const lastActive     = profile?.last_active_date ?? null;
+  const alreadyChecked = lastActive === today;
+  const hasFreezeThisWeek = profile?.streak_freeze_used_week === true;
 
   const [partners, setPartners]         = useState<PartnerInfo[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -123,8 +126,12 @@ export default function StreaksScreen() {
   const [milestone, setMilestone]       = useState<Milestone | null>(null);
 
   useFocusEffect(useCallback(() => {
-    if (user?.id) loadPartners();
-  }, [user?.id]));
+    if (!user?.id) return;
+    loadPartners();
+    getProfile(user.id).then((p) => {
+      if (p) updateProfile(p);
+    });
+  }, [user?.id, updateProfile]));
 
   const loadPartners = async () => {
     if (!user?.id) return;
@@ -147,22 +154,40 @@ export default function StreaksScreen() {
     if (alreadyChecked || !user?.id) return;
     setIsCheckingIn(true);
     try {
-      const newStreak = streak + 1;
-      await supabase.from('profiles').update({
+      const yesterday = previousLocalDateIso();
+      let newStreak = 1;
+      if (lastActive === yesterday) {
+        newStreak = streak + 1;
+      } else if (lastActive === today) {
+        setIsCheckingIn(false);
+        return;
+      }
+
+      const { error } = await supabase.from('profiles').update({
         streak_count: newStreak,
         last_active_date: today,
+        streak_freeze_used_week: false,
       }).eq('id', user.id);
-      updateProfile({ streak_count: newStreak, last_active_date: today } as any);
 
-      // ── Check for milestone celebration ──
+      if (error) {
+        Alert.alert('Check-in failed', error.message || 'Could not save streak. Try again.');
+        return;
+      }
+
+      updateProfile({
+        streak_count: newStreak,
+        last_active_date: today,
+        streak_freeze_used_week: false,
+      });
+
       const hit = checkStreakMilestone(newStreak);
       if (hit) {
         setMilestone(hit);
       } else {
         Alert.alert('Streak extended! 🔥', `You're on a ${newStreak}-day streak. Keep it up!`);
       }
-    } catch {
-      Alert.alert('Error', 'Could not check in. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not check in. Please try again.');
     } finally {
       setIsCheckingIn(false);
     }
@@ -180,10 +205,15 @@ export default function StreaksScreen() {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Freeze', onPress: async () => {
           if (!user?.id) return;
-          await supabase.from('profiles').update({
-            streak_freeze_used_week: today.slice(0, 7),
+          const { error } = await supabase.from('profiles').update({
+            streak_freeze_used_week: true,
+            last_active_date: today,
           }).eq('id', user.id);
-          updateProfile({ streak_freeze_used_week: today.slice(0, 7) } as any);
+          if (error) {
+            Alert.alert('Error', error.message || 'Could not freeze streak.');
+            return;
+          }
+          updateProfile({ streak_freeze_used_week: true, last_active_date: today });
           Alert.alert('Streak frozen! 🧊', 'Your streak is protected for today.');
         }},
       ]

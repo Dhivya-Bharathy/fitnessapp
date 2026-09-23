@@ -23,6 +23,7 @@ export interface Profile {
   dietary_preference: string[] | null;
   tracking_preferences: string[] | null;
   streak_count: number;
+  streak_freeze_used_week?: boolean;
   last_active_date: string | null;
   created_at: string;
   updated_at: string;
@@ -34,6 +35,51 @@ export interface Profile {
  * @param userId - The UUID of the user whose profile to retrieve.
  * @returns The user's Profile object, or null if not found or on error.
  */
+export async function saveOnboardingProfile(
+  userId: string,
+  fields: {
+    full_name: string;
+    calfit_id: string;
+    goal: string;
+    height_cm: number | null;
+    current_weight_kg: number | null;
+    tracking_preferences: string[];
+  },
+): Promise<{ ok: true; profile: Partial<Profile> } | { ok: false; message: string }> {
+  const calfit_id = fields.calfit_id.trim().toLowerCase();
+  if (calfit_id.length < 3) {
+    return { ok: false, message: 'Username must be at least 3 characters (letters, numbers, underscore).' };
+  }
+
+  const row = {
+    id: userId,
+    full_name: fields.full_name.trim() || null,
+    calfit_id,
+    goal: fields.goal || null,
+    height_cm: fields.height_cm,
+    current_weight_kg: fields.current_weight_kg,
+    tracking_preferences: fields.tracking_preferences,
+  };
+
+  let { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
+
+  if (error?.code === '23505' && error.message?.includes('calfit_id')) {
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const alt = `${calfit_id}_${suffix}`.slice(0, 32);
+    ({ error } = await supabase.from('profiles').upsert({ ...row, calfit_id: alt }, { onConflict: 'id' }));
+    if (!error) {
+      return { ok: true, profile: { ...row, calfit_id: alt } };
+    }
+  }
+
+  if (error) {
+    if (__DEV__) console.error('[saveOnboardingProfile]', error.message);
+    return { ok: false, message: error.message || 'Could not save profile.' };
+  }
+
+  return { ok: true, profile: row };
+}
+
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await supabase
     .from('profiles')

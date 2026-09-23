@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, TextInput,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
+import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
+import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +13,6 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { useIsCompactPhone, useLayoutWidth } from '../../hooks/useLayoutWidth';
-import { useFooterInset } from '../../hooks/useFooterInset';
 
 const ACCENT = '#2DDC8C';
 
@@ -204,8 +204,6 @@ export default function OnboardingScreen() {
   const theme = colors[colorScheme];
   const layoutWidth = useLayoutWidth();
   const compact = useIsCompactPhone();
-  const footerInset = useFooterInset();
-  const footerSpace = footerInset + 88;
 
   type StepKey = 'welcome' | 'goal' | 'stats' | 'account' | 'generating';
   const flow: StepKey[] = ['welcome', 'goal', 'stats', 'account', 'generating'];
@@ -240,19 +238,15 @@ export default function OnboardingScreen() {
     if (prev) setStep(prev); else navigation.goBack();
   };
 
-  const saveProfile = async (userId: string) => {
-    await supabase.from('profiles').upsert({
-      id: userId,
-      full_name: name || null,
-      calfit_id: username || null,
-      goal: goal || null,
-      height_cm: parseFloat(height) || null,
-      current_weight_kg: parseFloat(weight) || null,
-      tracking_preferences: trackingPrefs,
-    });
-  };
-
   const handleSignUp = async () => {
+    if (!name.trim()) {
+      Alert.alert('Display name', 'Please enter your display name.');
+      return;
+    }
+    if (username.trim().length < 3) {
+      Alert.alert('Username', 'Pick a username with at least 3 characters (a–z, 0–9, underscore).');
+      return;
+    }
     setIsLoading(true);
     try {
       setOnboarding(true);
@@ -279,7 +273,22 @@ export default function OnboardingScreen() {
         isOnboarding: true,
       });
       if (anonData.user) {
-        await saveProfile(anonData.user.id);
+        const { saveOnboardingProfile } = await import('../../services/profileService');
+        const saved = await saveOnboardingProfile(anonData.user.id, {
+          full_name: name,
+          calfit_id: username,
+          goal,
+          height_cm: parseFloat(height) || null,
+          current_weight_kg: parseFloat(weight) || null,
+          tracking_preferences: trackingPrefs,
+        });
+        if (!saved.ok) {
+          Alert.alert('Profile not saved', saved.message);
+          setOnboarding(false);
+          setIsLoading(false);
+          return;
+        }
+        useAuthStore.getState().updateProfile(saved.profile as any);
         await useAuthStore.getState().loadProfile(anonData.user.id);
         const { sendWelcomeNotification } = await import('../../services/notificationService');
         await sendWelcomeNotification(anonData.user.id, 'there');
@@ -317,53 +326,55 @@ export default function OnboardingScreen() {
     }
   };
 
+  const bg = isWelcome ? '#080A0F' : theme.bg;
+
+  const header = !isWelcome && !isGenerating ? (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={goPrev} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+      </TouchableOpacity>
+      <Text style={[styles.headerLogo, { color: theme.accent }]}>Fitness App</Text>
+      <Text style={[styles.headerStep, { color: theme.textMuted }]}>{currentIndex}/{flow.length - 2}</Text>
+    </View>
+  ) : undefined;
+
+  const footer = showCTA ? (
+    <>
+      {isLoading ? (
+        <View style={styles.loadingFooter}>
+          <ActivityIndicator color={theme.accent} />
+        </View>
+      ) : (
+        <PrimaryCTA
+          label={btnLabel.replace(/\s*→\s*$/, '')}
+          onPress={handleNext}
+        />
+      )}
+      {step === 'welcome' && (
+        <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: spacing.sm }]}>
+          Your data stays on this device
+        </Text>
+      )}
+    </>
+  ) : null;
+
   return (
-    <AndroidSafeView backgroundColor={isWelcome ? '#080A0F' : theme.bg} style={styles.safe}>
-      {!isWelcome && !isGenerating && (
-        <View style={styles.header}>
-          <TouchableOpacity onPress={goPrev} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerLogo, { color: theme.accent }]}>Fitness App</Text>
-          <Text style={[styles.headerStep, { color: theme.textMuted }]}>{currentIndex}/{flow.length - 2}</Text>
-        </View>
-      )}
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scroll,
-          isGenerating && styles.scrollCenter,
-          (isWelcome || !isGenerating) && { paddingBottom: footerSpace },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
-        {getStep()}
-      </ScrollView>
-      {showCTA && (
-        <View style={[styles.bottomBar, { backgroundColor: isWelcome ? '#080A0F' : theme.bg, paddingBottom: footerInset }]}>
-          <TouchableOpacity onPress={handleNext} disabled={isLoading} activeOpacity={0.85} style={styles.ctaBtnWrap}>
-            <LinearGradient colors={[theme.accent, '#0DAE6C'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ctaBtn}>
-              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaBtnText}>{btnLabel}</Text>}
-            </LinearGradient>
-          </TouchableOpacity>
-          {step === 'welcome' && (
-            <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: spacing.md }]}>
-              Your data stays on this device
-            </Text>
-          )}
-        </View>
-      )}
-    </AndroidSafeView>
+    <StickyFooterLayout
+      backgroundColor={bg}
+      header={header}
+      footer={footer}
+      padHorizontal={false}
+      scrollPaddingBottom={spacing.lg}
+    >
+      <View style={isGenerating ? styles.scrollCenter : undefined}>{getStep()}</View>
+    </StickyFooterLayout>
   );
 }
 
 // ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollView: { flex: 1 },
-  scroll: { paddingBottom: spacing.lg, flexGrow: 1 },
-  scrollCenter: { flexGrow: 1, justifyContent: 'center' },
+  scrollCenter: { flexGrow: 1, justifyContent: 'center', minHeight: 280 },
+  loadingFooter: { paddingVertical: spacing.md, alignItems: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   headerLogo: { fontSize: fontSize.xl, fontWeight: '800' },
   headerStep: { fontSize: fontSize.sm, fontWeight: '600' },
@@ -416,14 +427,6 @@ const styles = StyleSheet.create({
   generatingWrap: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg, padding: spacing.xl },
   generatingTitle: { fontSize: 20, fontWeight: '700' },
 
-  // Bottom bar
-  bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.2)',
-  },
-  ctaBtnWrap: { borderRadius: 20, overflow: 'hidden' },
-  ctaBtn: { padding: 18, alignItems: 'center' },
-  ctaBtnText: { fontSize: fontSize.lg, fontWeight: '800', color: '#fff' },
   signInRow: { alignItems: 'center', marginTop: spacing.md },
   signInText: { fontSize: fontSize.sm },
 });

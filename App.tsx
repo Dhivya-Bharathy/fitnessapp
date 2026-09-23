@@ -31,7 +31,10 @@ export default function App() {
     const t = setTimeout(() => setFontTimeout(true), 5000);
     if (Platform.OS === 'web') {
       const style = document.createElement('style');
-      style.textContent = "@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.3/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal}";
+      style.textContent = "@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.3/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal}"
+        + "html,body,#root{height:100%;margin:0;overscroll-behavior:none;}"
+        + "#root{display:flex;flex-direction:column;min-height:100dvh;}"
+        + "[data-focusable=true]{touch-action:manipulation;}";
       document.head.appendChild(style);
       return () => { clearTimeout(t); document.head.removeChild(style); };
     }
@@ -45,7 +48,10 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      useAuthStore.setState({ authReady: false });
+      const alreadyReady = useAuthStore.getState().authReady;
+      if (!alreadyReady) {
+        useAuthStore.setState({ authReady: false });
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
       setSession(session);

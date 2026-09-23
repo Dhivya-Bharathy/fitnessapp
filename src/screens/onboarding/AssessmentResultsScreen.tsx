@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
+  View, Text, StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
+import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,10 +12,9 @@ import { useAuthStore } from '../../store/authStore';
 import { useAssessmentStore } from '../../store/assessmentStore';
 import { useAiCoachStore } from '../../store/aiCoachStore';
 import { colors, spacing, fontSize, radius } from '../../theme';
-import { generateDemicAssessmentPlan } from '../../services/openai-client';
+import { generateDemicAssessmentPlan, countAnsweredQuestions } from '../../services/openai-client';
 import { supabase } from '../../services/supabase';
-import { mergeAssessmentDonePrefs } from '../../utils/onboardingFlags';
-import { useFooterInset } from '../../hooks/useFooterInset';
+import { mergeAssessmentDonePrefs, setLocalAssessmentComplete } from '../../utils/onboardingFlags';
 import { MOTIVATIONAL_LINES } from '../../data/fitnessAssessmentQuestions';
 import { clearAssessmentPersistence } from '../../utils/assessmentPersistence';
 import { Image } from 'react-native';
@@ -21,25 +22,25 @@ import { Image } from 'react-native';
 export default function AssessmentResultsScreen() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
-  const footerInset = useFooterInset();
-  const footerSpace = footerInset + 80;
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const updateProfile = useAuthStore((s) => s.updateProfile);
-  const { answers, result, isGenerating, setGenerating, setResult, setError, error } = useAssessmentStore();
+  const { result, isGenerating, setGenerating, setResult, setError, error, planFromAi } = useAssessmentStore();
   const setCurrentWorkout = useAiCoachStore((s) => s.clearCurrentWorkout);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setGenerating(true);
-      setError(null);
-      const plan = await generateDemicAssessmentPlan(answers);
-      if (cancelled) return;
-      setResult(plan);
+  const runGeneration = useCallback(async () => {
+    const snapshot = useAssessmentStore.getState().answers;
+    setGenerating(true);
+    setError(null);
+    setResult(null, false);
+
+    try {
+      const plan = await generateDemicAssessmentPlan(snapshot);
+      setResult(plan, true);
       setGenerating(false);
 
       if (user?.id) {
+        await setLocalAssessmentComplete(user.id);
         await supabase.from('profiles').update({
           bio: plan.coach_summary?.slice(0, 500),
           equipment_preferences: plan.workout.focus_moves ?? plan.workout.demic_story_moves ?? [],
@@ -62,9 +63,15 @@ export default function AssessmentResultsScreen() {
           /* table may be missing until migration */
         }
       }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    } catch (e) {
+      setGenerating(false);
+      setError(e instanceof Error ? e.message : 'Could not generate plan');
+    }
+  }, [setError, setGenerating, setResult, user?.id]);
+
+  useEffect(() => {
+    runGeneration();
+  }, [runGeneration]);
 
   const finish = async () => {
     if (result?.workout) {
@@ -73,6 +80,7 @@ export default function AssessmentResultsScreen() {
       setCurrentWorkout();
     }
     if (user?.id) {
+      await setLocalAssessmentComplete(user.id);
       const tracking_preferences = mergeAssessmentDonePrefs(profile?.tracking_preferences);
       await supabase.from('profiles').update({ tracking_preferences }).eq('id', user.id);
       updateProfile({ tracking_preferences });
@@ -82,6 +90,26 @@ export default function AssessmentResultsScreen() {
     useAuthStore.getState().setOnboarding(false);
   };
 
+  if (error && !result && !isGenerating) {
+    const answered = countAnsweredQuestions(useAssessmentStore.getState().answers);
+    return (
+      <StickyFooterLayout
+        backgroundColor={theme.bg}
+        footer={<PrimaryCTA label="Try again" onPress={runGeneration} />}
+      >
+        <View style={styles.errorWrap}>
+          <Ionicons name="cloud-offline-outline" size={48} color={theme.accent} />
+          <Text style={[styles.loadingTitle, { color: theme.textPrimary }]}>AI plan not generated</Text>
+          <Text style={[styles.errorText, { color: '#FF5959' }]}>{error}</Text>
+          <Text style={[styles.loadingSub, { color: theme.textSecondary }]}>
+            {answered} answers saved on this device. On your PC: run npm run proxy:ai, keep Expo running, then tap Try again.
+            Phone must use the same Wi‑Fi and EXPO_PUBLIC_ASSESSMENT_PROXY_URL=http://YOUR_PC_IP:8787 in .env.
+          </Text>
+        </View>
+      </StickyFooterLayout>
+    );
+  }
+
   if (isGenerating || !result) {
     return (
       <AndroidSafeView backgroundColor={theme.bg} style={styles.center}>
@@ -90,9 +118,8 @@ export default function AssessmentResultsScreen() {
           Building your plan…
         </Text>
         <Text style={[styles.loadingSub, { color: theme.textSecondary }]}>
-          AI training + Indian diet
+          Reading your {countAnsweredQuestions(useAssessmentStore.getState().answers)} answers → OpenAI
         </Text>
-        {error ? <Text style={{ color: '#FF5959', marginTop: spacing.md }}>{error}</Text> : null}
       </AndroidSafeView>
     );
   }
@@ -102,8 +129,11 @@ export default function AssessmentResultsScreen() {
   const tagline = MOTIVATIONAL_LINES[Math.abs(coach_summary.length) % MOTIVATIONAL_LINES.length];
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: footerSpace }]}>
+    <StickyFooterLayout
+      backgroundColor={theme.bg}
+      footer={<PrimaryCTA label="Start Fitness App" onPress={finish} />}
+    >
+      <View style={styles.scrollInner}>
         <View style={styles.heroImageWrap}>
           <Image
             source={{ uri: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=80' }}
@@ -115,6 +145,11 @@ export default function AssessmentResultsScreen() {
         <LinearGradient colors={[theme.accent + '33', theme.bg]} style={styles.hero}>
           <Ionicons name="sparkles" size={32} color={theme.accent} />
           <Text style={[styles.heroTitle, { color: theme.textPrimary }]}>Your AI plan is ready</Text>
+          {planFromAi ? (
+            <Text style={[styles.aiBadge, { color: theme.accent, borderColor: theme.accent }]}>
+              Personalized from your 22 answers
+            </Text>
+          ) : null}
           <Text style={[styles.heroTag, { color: theme.accent }]}>{tagline}</Text>
           <Text style={[styles.heroSub, { color: theme.textSecondary }]}>{coach_summary}</Text>
         </LinearGradient>
@@ -170,25 +205,22 @@ export default function AssessmentResultsScreen() {
             ))}
           </>
         ) : null}
-      </ScrollView>
-
-      <View style={[styles.footer, { backgroundColor: theme.bg, paddingBottom: footerInset, borderTopColor: theme.border }]}>
-        <TouchableOpacity onPress={finish} activeOpacity={0.85} style={styles.ctaWrap}>
-          <LinearGradient colors={[theme.accent, '#0DAE6C']} style={styles.cta}>
-            <Text style={styles.ctaText}>Start Fitness App →</Text>
-          </LinearGradient>
-        </TouchableOpacity>
       </View>
-    </AndroidSafeView>
+    </StickyFooterLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  scrollInner: { paddingTop: spacing.xs },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   loadingTitle: { fontSize: fontSize.xl, fontWeight: '800', marginTop: spacing.lg },
-  loadingSub: { fontSize: fontSize.base, marginTop: spacing.sm, textAlign: 'center' },
-  scroll: { padding: spacing.lg, paddingBottom: 120 },
+  loadingSub: { fontSize: fontSize.base, marginTop: spacing.sm, textAlign: 'center', lineHeight: 22, paddingHorizontal: spacing.md },
+  errorWrap: { alignItems: 'center', paddingTop: spacing.xl, gap: spacing.sm },
+  errorText: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20, paddingHorizontal: spacing.md },
+  aiBadge: {
+    marginTop: spacing.sm, fontSize: fontSize.xs, fontWeight: '700',
+    borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
+  },
   heroImageWrap: { height: 160, borderRadius: radius.xl, overflow: 'hidden', marginBottom: spacing.md },
   heroImage: { width: '100%', height: '100%' },
   heroImageFade: { ...StyleSheet.absoluteFillObject },
@@ -208,11 +240,4 @@ const styles = StyleSheet.create({
   mealRow: { marginTop: spacing.sm },
   tags: { fontSize: fontSize.xs, marginTop: spacing.md, fontStyle: 'italic' },
   outline: { fontSize: fontSize.sm, marginBottom: 4, paddingLeft: spacing.sm },
-  footer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  ctaWrap: { borderRadius: 20, overflow: 'hidden' },
-  cta: { padding: 18, alignItems: 'center' },
-  ctaText: { color: '#fff', fontSize: fontSize.lg, fontWeight: '800' },
 });

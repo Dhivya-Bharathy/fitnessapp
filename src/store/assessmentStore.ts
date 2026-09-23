@@ -33,11 +33,12 @@ interface AssessmentState {
   result: DemicAssessmentResult | null;
   isGenerating: boolean;
   error: string | null;
+  planFromAi: boolean;
   setAnswer: (id: string, value: AssessmentAnswerValue) => void;
   toggleMulti: (id: string, value: string) => void;
   hydrateAnswers: (answers: AssessmentAnswers) => void;
   reset: () => void;
-  setResult: (r: DemicAssessmentResult | null) => void;
+  setResult: (r: DemicAssessmentResult | null, fromAi?: boolean) => void;
   setGenerating: (v: boolean) => void;
   setError: (e: string | null) => void;
 }
@@ -47,6 +48,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
   result: null,
   isGenerating: false,
   error: null,
+  planFromAi: false,
   setAnswer: (id, value) => {
     const answers = { ...get().answers, [id]: value };
     set({ answers });
@@ -64,8 +66,8 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
     set({ answers });
     persistAssessmentAnswers(answers);
   },
-  reset: () => set({ answers: {}, result: null, error: null, isGenerating: false }),
-  setResult: (r) => set({ result: r }),
+  reset: () => set({ answers: {}, result: null, error: null, isGenerating: false, planFromAi: false }),
+  setResult: (r, fromAi = true) => set({ result: r, planFromAi: fromAi, error: null }),
   setGenerating: (v) => set({ isGenerating: v }),
   setError: (e) => set({ error: e }),
 }));
