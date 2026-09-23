@@ -52,6 +52,10 @@ export default function App() {
       if (!alreadyReady) {
         useAuthStore.setState({ authReady: false });
       }
+      const { readForceAssessmentRetake } = await import('./src/utils/onboardingFlags');
+      if (await readForceAssessmentRetake()) {
+        useAuthStore.setState({ forceAssessmentRetake: true, isOnboarding: true });
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
       setSession(session);

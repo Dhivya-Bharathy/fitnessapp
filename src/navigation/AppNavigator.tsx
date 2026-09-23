@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, Platform, StatusBar, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -243,6 +243,7 @@ function TabNavigator() {
 
 // ── AUTH STACK (no headers — screens have own UI) ────────────
 function AuthStack() {
+  const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const authEpoch = useAuthStore((s) => s.authEpoch);
@@ -263,6 +264,23 @@ function AuthStack() {
       active = false;
     };
   }, [user?.id, authEpoch]);
+
+  useEffect(() => {
+    if (!user?.id || !profile?.goal) return;
+    const assessmentDone =
+      !forceAssessmentRetake
+      && (isFitnessAssessmentComplete(profile) || assessmentDoneLocal);
+    if (!assessmentDone) {
+      navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
+    }
+  }, [
+    user?.id,
+    profile?.goal,
+    profile?.tracking_preferences,
+    forceAssessmentRetake,
+    assessmentDoneLocal,
+    navigation,
+  ]);
 
   const initialRoute = useMemo(() => {
     if (!user) return 'Welcome';

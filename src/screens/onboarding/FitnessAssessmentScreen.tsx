@@ -14,7 +14,8 @@ import {
 } from '../../data/fitnessAssessmentQuestions';
 import { useAssessmentStore } from '../../store/assessmentStore';
 import { useIsCompactPhone } from '../../hooks/useLayoutWidth';
-import { loadPersistedAssessment, persistAssessmentIndex } from '../../utils/assessmentPersistence';
+import { loadPersistedAssessment, persistAssessmentIndex, clearAssessmentPersistence } from '../../utils/assessmentPersistence';
+import { useAuthStore } from '../../store/authStore';
 import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
 import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
 
@@ -31,6 +32,15 @@ export default function FitnessAssessmentScreen() {
   useEffect(() => {
     let active = true;
     (async () => {
+      if (useAuthStore.getState().forceAssessmentRetake) {
+        await clearAssessmentPersistence();
+        useAssessmentStore.getState().reset();
+        if (active) {
+          setIndex(0);
+          setHydrated(true);
+        }
+        return;
+      }
       const saved = await loadPersistedAssessment();
       if (!active || !saved) {
         setHydrated(true);

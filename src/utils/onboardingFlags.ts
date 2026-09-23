@@ -5,6 +5,23 @@ import type { Profile } from '../services/profileService';
 export const FITNESS_ASSESSMENT_DONE = 'fitness_assessment_done';
 
 const LOCAL_ASSESSMENT_KEY = '@fitness_assessment_complete_v1';
+const FORCE_RETAKE_KEY = '@fitness_force_assessment_retake_v1';
+
+export async function persistForceAssessmentRetake(value: boolean): Promise<void> {
+  if (value) {
+    await AsyncStorage.setItem(FORCE_RETAKE_KEY, '1');
+  } else {
+    await AsyncStorage.removeItem(FORCE_RETAKE_KEY);
+  }
+}
+
+export async function readForceAssessmentRetake(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(FORCE_RETAKE_KEY)) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export function isFitnessAssessmentComplete(profile: Profile | null | undefined): boolean {
   return profile?.tracking_preferences?.includes(FITNESS_ASSESSMENT_DONE) ?? false;

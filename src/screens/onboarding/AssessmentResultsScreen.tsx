@@ -87,6 +87,8 @@ export default function AssessmentResultsScreen() {
     }
     await clearAssessmentPersistence();
     useAssessmentStore.getState().reset();
+    const { persistForceAssessmentRetake } = await import('../../utils/onboardingFlags');
+    await persistForceAssessmentRetake(false);
     useAuthStore.getState().setForceAssessmentRetake(false);
     useAuthStore.getState().setOnboarding(false);
   };

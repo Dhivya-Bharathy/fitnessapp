@@ -108,6 +108,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ profile });
       }
 
+      if (get().forceAssessmentRetake) {
+        set({ isOnboarding: true });
+        return profile;
+      }
+
       if (!get().isOnboarding) {
         const { isAssessmentCompleteForUser } = await import('../utils/onboardingFlags');
         const complete = await isAssessmentCompleteForUser(userId, profile, {
@@ -184,7 +189,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const userId = get().user?.id;
 
     const { resetLocalUserState, clearSupabaseAuthStorage } = await import('../utils/resetLocalUserState');
+    const { persistForceAssessmentRetake } = await import('../utils/onboardingFlags');
     await resetLocalUserState();
+    await persistForceAssessmentRetake(true);
 
     if (userId) {
       const { deleteAccountData } = await import('../services/profileService');
