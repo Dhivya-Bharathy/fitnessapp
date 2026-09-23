@@ -13,17 +13,24 @@ export async function resetLocalUserState(): Promise<void> {
 
 /** Removes Supabase auth tokens from browser storage so session cannot restore. */
 export function clearSupabaseAuthStorage(): void {
-  if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return;
+  if (Platform.OS !== 'web') return;
   const projectRef = process.env.EXPO_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1];
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const key = localStorage.key(i);
-    if (!key) continue;
-    if (
-      key.startsWith('sb-') ||
-      key.includes('supabase') ||
-      (projectRef && key.includes(projectRef))
-    ) {
-      localStorage.removeItem(key);
+
+  const clearStorage = (storage: Storage) => {
+    for (let i = storage.length - 1; i >= 0; i--) {
+      const key = storage.key(i);
+      if (!key) continue;
+      if (
+        key.startsWith('sb-') ||
+        key.includes('supabase') ||
+        key.includes('auth-token') ||
+        (projectRef && key.includes(projectRef))
+      ) {
+        storage.removeItem(key);
+      }
     }
-  }
+  };
+
+  if (typeof localStorage !== 'undefined') clearStorage(localStorage);
+  if (typeof sessionStorage !== 'undefined') clearStorage(sessionStorage);
 }

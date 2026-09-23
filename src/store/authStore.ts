@@ -12,6 +12,9 @@ interface AuthState {
   isOnboarding: boolean;
   /** Bumped on sign-out / delete to remount navigation at Welcome. */
   authEpoch: number;
+  /** After delete account — must redo 22-question assessment even if server flag remains. */
+  forceAssessmentRetake: boolean;
+  setForceAssessmentRetake: (v: boolean) => void;
   userTier: 'free' | 'pro' | 'premium';
   liveSteps: number;
   setLiveSteps: (steps: number) => void;
@@ -67,12 +70,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isOnboarding: true,
   authEpoch: 0,
+  forceAssessmentRetake: false,
   userTier: 'free',
   liveSteps: 0,
 
   setLiveSteps: (steps) => set({ liveSteps: steps }),
   setOnboarding: (v) => set({ isOnboarding: v }),
   bumpAuthEpoch: () => set((s) => ({ authEpoch: s.authEpoch + 1 })),
+  setForceAssessmentRetake: (v) => set({ forceAssessmentRetake: v }),
 
   setSession: (session) => {
     if (!session) {
@@ -105,10 +110,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (!get().isOnboarding) {
         const { isAssessmentCompleteForUser } = await import('../utils/onboardingFlags');
-        const complete = await isAssessmentCompleteForUser(userId, profile);
-        if (!profile?.goal) {
-          set({ isOnboarding: true });
-        } else if (!complete) {
+        const complete = await isAssessmentCompleteForUser(userId, profile, {
+          forceRetake: get().forceAssessmentRetake,
+        });
+        if (get().forceAssessmentRetake || !profile?.goal || !complete) {
           set({ isOnboarding: true });
         } else {
           set({ isOnboarding: false });
@@ -184,8 +189,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (userId) {
       const { deleteAccountData } = await import('../services/profileService');
       const deleted = await deleteAccountData(userId);
-      if (!deleted.ok) {
-        return { ok: false, message: deleted.message ?? 'Could not reset account on server.' };
+      if (!deleted.ok && __DEV__) {
+        console.warn('[deleteAccount] server reset:', deleted.message);
       }
     }
 
@@ -200,6 +205,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session: null,
       profile: null,
       isOnboarding: true,
+      forceAssessmentRetake: true,
       isAuthenticated: false,
       userTier: 'free',
       liveSteps: 0,

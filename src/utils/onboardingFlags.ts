@@ -37,7 +37,15 @@ export async function clearLocalAssessmentComplete(): Promise<void> {
 export async function isAssessmentCompleteForUser(
   userId: string,
   profile: Profile | null | undefined,
+  options?: { forceRetake?: boolean },
 ): Promise<boolean> {
+  if (options?.forceRetake) return false;
   if (isFitnessAssessmentComplete(profile)) return true;
   return getLocalAssessmentComplete(userId);
+}
+
+export function stripAssessmentDoneFromPrefs(
+  existing: string[] | null | undefined,
+): string[] {
+  return (existing ?? []).filter((p) => p && p !== FITNESS_ASSESSMENT_DONE);
 }

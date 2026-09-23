@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { stripAssessmentDoneFromPrefs } from '../utils/onboardingFlags';
 
 /** Represents a user's profile data including goals, body metrics, preferences, and daily targets. */
 export interface Profile {
@@ -58,7 +59,7 @@ export async function saveOnboardingProfile(
     goal: fields.goal || null,
     height_cm: fields.height_cm,
     current_weight_kg: fields.current_weight_kg,
-    tracking_preferences: fields.tracking_preferences,
+    tracking_preferences: stripAssessmentDoneFromPrefs(fields.tracking_preferences),
   };
 
   let { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
@@ -91,7 +92,7 @@ export async function wipeProfileOnServer(userId: string): Promise<{ ok: boolean
       bio: null,
       height_cm: null,
       current_weight_kg: null,
-      tracking_preferences: [],
+      tracking_preferences: stripAssessmentDoneFromPrefs([]),
       equipment_preferences: [],
       streak_count: 0,
       last_active_date: null,

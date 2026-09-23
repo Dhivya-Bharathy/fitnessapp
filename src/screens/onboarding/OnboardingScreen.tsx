@@ -304,6 +304,7 @@ export default function OnboardingScreen() {
         await sendWelcomeNotification(session.user.id, name || 'there');
       }
 
+      useAuthStore.getState().setOnboarding(true);
       setIsLoading(false);
       navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
     } catch {

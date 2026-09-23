@@ -87,6 +87,7 @@ export default function AssessmentResultsScreen() {
     }
     await clearAssessmentPersistence();
     useAssessmentStore.getState().reset();
+    useAuthStore.getState().setForceAssessmentRetake(false);
     useAuthStore.getState().setOnboarding(false);
   };
 

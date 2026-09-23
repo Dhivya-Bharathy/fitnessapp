@@ -246,6 +246,7 @@ function AuthStack() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const authEpoch = useAuthStore((s) => s.authEpoch);
+  const forceAssessmentRetake = useAuthStore((s) => s.forceAssessmentRetake);
   const [assessmentDoneLocal, setAssessmentDoneLocal] = useState(false);
 
   useEffect(() => {
@@ -263,22 +264,15 @@ function AuthStack() {
     };
   }, [user?.id, authEpoch]);
 
-  useEffect(() => {
-    if (!user?.id || !profile?.goal) return;
-    const done = isFitnessAssessmentComplete(profile) || assessmentDoneLocal;
-    if (done) {
-      useAuthStore.getState().setOnboarding(false);
-    }
-  }, [user?.id, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal]);
-
   const initialRoute = useMemo(() => {
     if (!user) return 'Welcome';
     if (!profile?.goal) return 'Onboarding';
     const assessmentDone =
-      isFitnessAssessmentComplete(profile) || assessmentDoneLocal;
+      !forceAssessmentRetake
+      && (isFitnessAssessmentComplete(profile) || assessmentDoneLocal);
     if (!assessmentDone) return 'FitnessAssessment';
-    return 'Onboarding';
-  }, [user, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal]);
+    return 'Welcome';
+  }, [user, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal, forceAssessmentRetake]);
 
   return (
     <RootStack.Navigator
