@@ -16,30 +16,35 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+function normalizeWorkout(workout: GeneratedWorkout & { focus_moves?: string[]; demic_story_moves?: string[] }) {
+  const focus = workout.focus_moves ?? workout.demic_story_moves;
+  return { ...workout, focus_moves: focus, demic_story_moves: undefined };
+}
+
 function fallbackPlan(answers: AssessmentAnswers): DemicAssessmentResult {
   const duration = Number(answers.session_minutes) || 30;
-  const workout: GeneratedWorkout & { demic_story_moves?: string[] } = {
+  const workout: GeneratedWorkout & { focus_moves?: string[] } = {
     id: generateId(),
-    title: 'Demic Story Starter — Full Body Calisthenics',
-    description: 'Bodyweight strength and conditioning inspired by athletic calisthenics progressions.',
+    title: 'AI Training — Full Body Session',
+    description: 'Balanced strength and conditioning matched to your level and equipment.',
     duration,
     difficulty: 4,
-    warmup: ['5 min march + arm circles', 'Scapular pull-ups or dead hang 3×20s', 'Hip openers'],
+    warmup: ['5 min march + arm circles', 'Band pull-aparts or arm swings', 'Hip openers'],
     exercises: [
       { name: 'Incline / Knee Push-ups', sets: 3, reps: '8-12', rest: 60, form_tips: 'Ribs down, full range', progression: 'Lower incline weekly' },
-      { name: 'Australian Rows', sets: 3, reps: '8-10', rest: 60, form_tips: 'Body straight, squeeze shoulder blades', progression: 'Feet forward for difficulty' },
-      { name: 'Bodyweight Squats', sets: 3, reps: '15', rest: 45, form_tips: 'Knees track toes', progression: 'Add jump squats' },
+      { name: 'Rows (band or gym)', sets: 3, reps: '8-10', rest: 60, form_tips: 'Body straight, squeeze shoulder blades', progression: 'Add weight or slow tempo' },
+      { name: 'Bodyweight Squats', sets: 3, reps: '15', rest: 45, form_tips: 'Knees track toes', progression: 'Add goblet squat if gym access' },
       { name: 'Plank', sets: 3, reps: '30-45s', rest: 45, form_tips: 'Glutes tight', progression: 'Shoulder taps' },
     ],
     cooldown: ['Walk 3 min', 'Quad & chest stretch'],
-    ai_notes: 'OpenAI key missing or API error — showing offline Demic-style template. Add EXPO_PUBLIC_OPENAI_API_KEY to .env and restart.',
+    ai_notes: 'Offline template — add EXPO_PUBLIC_OPENAI_API_KEY for a fully personalized AI plan.',
     created_at: new Date().toISOString(),
-    demic_story_moves: ['Scapular pull-ups', 'Push-up variations', 'Australian rows'],
+    focus_moves: ['Push patterns', 'Pull / row', 'Squat pattern', 'Core bracing'],
   };
 
   return {
-    coach_summary: 'Start with consistent full-body calisthenics and simple Indian home meals. Progress pull and push patterns like Demic Story–style bar work when ready.',
-    weekly_outline: ['Full body calisthenics', 'Rest or walk', 'Repeat + add reps'],
+    coach_summary: 'You’re building a habit that lasts. Pair these workouts with simple Indian home meals and show up on the days you picked — progress will follow.',
+    weekly_outline: ['Full body strength', 'Active recovery / walk', 'Repeat + add reps'],
     workout,
     indian_diet_plan: {
       title: 'Simple Indian Day Plan',
@@ -56,7 +61,7 @@ function fallbackPlan(answers: AssessmentAnswers): DemicAssessmentResult {
   };
 }
 
-/** Generates Demic Story–style workout + Indian diet from 22-question intake. */
+/** Generates AI training + Indian diet from 22-question intake. */
 export async function generateDemicAssessmentPlan(
   answers: AssessmentAnswers,
 ): Promise<DemicAssessmentResult> {
@@ -98,11 +103,11 @@ export async function generateDemicAssessmentPlan(
       return fallbackPlan(answers);
     }
 
-    parsed.workout = {
+    parsed.workout = normalizeWorkout({
       ...parsed.workout,
       id: generateId(),
       created_at: new Date().toISOString(),
-    };
+    });
 
     return parsed;
   } catch (e) {

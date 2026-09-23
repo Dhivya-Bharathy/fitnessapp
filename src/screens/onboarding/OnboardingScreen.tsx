@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Alert, ActivityIndicator, TextInput, Dimensions,
+  Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useState } from 'react';
@@ -11,8 +11,9 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
+import { useIsCompactPhone, useLayoutWidth } from '../../hooks/useLayoutWidth';
+import { useFooterInset } from '../../hooks/useFooterInset';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const ACCENT = '#2DDC8C';
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -37,16 +38,21 @@ const WELCOME_FEATURES = [
 function StepWelcome({
   selected,
   onToggle,
+  layoutWidth,
+  compact,
 }: {
   selected: string[];
   onToggle: (id: string) => void;
+  layoutWidth: number;
+  compact: boolean;
 }) {
+  const cardWidth = compact ? layoutWidth - spacing.lg * 2 : (layoutWidth - spacing.lg * 2 - 12) / 2;
   return (
     <View style={styles.welcomeWrap}>
       <View style={styles.welcomeGlow} />
-      <Text style={styles.welcomeLogo}>FITNESS APP</Text>
+      <Text style={[styles.welcomeLogo, compact && styles.welcomeLogoCompact]}>FITNESS APP</Text>
       <Text style={styles.welcomeTagline}>
-        <Text style={{ color: ACCENT }}>22 questions</Text> → AI Demic Story training +{' '}
+        <Text style={{ color: ACCENT }}>22 questions</Text> → AI training +{' '}
         <Text style={{ color: ACCENT }}>Indian diet</Text>
       </Text>
       <Text style={styles.welcomeHint}>Tap to choose what you want to track (pick one or more)</Text>
@@ -58,7 +64,7 @@ function StepWelcome({
               key={c.id}
               activeOpacity={0.85}
               onPress={() => onToggle(c.id)}
-              style={[styles.featureCard, active && styles.featureCardActive]}
+              style={[styles.featureCard, { width: cardWidth }, active && styles.featureCardActive]}
             >
               {active && (
                 <View style={styles.featureCheck}>
@@ -146,7 +152,7 @@ function StepAccount({ theme, name, setName, username, setUsername, isLoading, o
     <StepWrap>
       <View style={styles.accountHeader}>
         <LinearGradient colors={['#F0427C', '#FF6B35', '#FFB830']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logoCircle}>
-          <Text style={styles.logoLetter}>C</Text>
+          <Text style={styles.logoLetter}>F</Text>
         </LinearGradient>
         <StepTitle text="Your Profile" theme={theme} />
         <StepSub text="Set your display name and username to personalise your experience." theme={theme} />
@@ -196,6 +202,10 @@ export default function OnboardingScreen() {
   const { colorScheme } = useThemeStore();
   const { setOnboarding } = useAuthStore();
   const theme = colors[colorScheme];
+  const layoutWidth = useLayoutWidth();
+  const compact = useIsCompactPhone();
+  const footerInset = useFooterInset();
+  const footerSpace = footerInset + 88;
 
   type StepKey = 'welcome' | 'goal' | 'stats' | 'account' | 'generating';
   const flow: StepKey[] = ['welcome', 'goal', 'stats', 'account', 'generating'];
@@ -298,7 +308,7 @@ export default function OnboardingScreen() {
 
   const getStep = () => {
     switch (step) {
-      case 'welcome':  return <StepWelcome selected={trackingPrefs} onToggle={toggleTrackingPref} />;
+      case 'welcome':  return <StepWelcome selected={trackingPrefs} onToggle={toggleTrackingPref} layoutWidth={layoutWidth} compact={compact} />;
       case 'goal':     return <StepGoal theme={theme} selected={goal} onSelect={setGoal} />;
       case 'stats':    return <StepStats theme={theme} height={height} setHeight={setHeight} weight={weight} setWeight={setWeight} />;
       case 'account':  return <StepAccount theme={theme} name={name} setName={setName} username={username} setUsername={setUsername} isLoading={isLoading} onSignUp={handleSignUp} />;
@@ -323,15 +333,15 @@ export default function OnboardingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
-          (isGenerating || isWelcome) && styles.scrollCenter,
-          !isWelcome && !isGenerating && styles.scrollWithFooter,
+          isGenerating && styles.scrollCenter,
+          (isWelcome || !isGenerating) && { paddingBottom: footerSpace },
         ]}
         keyboardShouldPersistTaps="handled"
       >
         {getStep()}
       </ScrollView>
       {showCTA && (
-        <View style={[styles.bottomBar, { backgroundColor: isWelcome ? '#080A0F' : theme.bg }]}>
+        <View style={[styles.bottomBar, { backgroundColor: isWelcome ? '#080A0F' : theme.bg, paddingBottom: footerInset }]}>
           <TouchableOpacity onPress={handleNext} disabled={isLoading} activeOpacity={0.85} style={styles.ctaBtnWrap}>
             <LinearGradient colors={[theme.accent, '#0DAE6C'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ctaBtn}>
               {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaBtnText}>{btnLabel}</Text>}
@@ -353,23 +363,23 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollView: { flex: 1 },
   scroll: { paddingBottom: spacing.lg, flexGrow: 1 },
-  scrollWithFooter: { paddingBottom: 160 },
   scrollCenter: { flexGrow: 1, justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   headerLogo: { fontSize: fontSize.xl, fontWeight: '800' },
   headerStep: { fontSize: fontSize.sm, fontWeight: '600' },
   stepContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  stepTitle: { fontSize: 28, fontWeight: '800', marginBottom: spacing.sm, lineHeight: 34 },
+  stepTitle: { fontSize: 24, fontWeight: '800', marginBottom: spacing.sm, lineHeight: 30 },
   stepSub: { fontSize: fontSize.base, marginBottom: 24, lineHeight: 22 },
 
   // Welcome
-  welcomeWrap: { flex: 1, backgroundColor: '#080A0F', paddingHorizontal: spacing.lg, paddingTop: 48, paddingBottom: 20, alignItems: 'center' },
+  welcomeWrap: { backgroundColor: '#080A0F', paddingHorizontal: spacing.lg, paddingTop: 24, paddingBottom: 12, alignItems: 'center', width: '100%' },
   welcomeGlow: { position: 'absolute', top: 20, width: 280, height: 120, backgroundColor: 'rgba(45,220,140,0.08)', borderRadius: 140 },
-  welcomeLogo: { fontSize: 52, fontWeight: '900', color: '#2DDC8C', letterSpacing: 10, marginBottom: 12, textAlign: 'center' },
+  welcomeLogo: { fontSize: 36, fontWeight: '900', color: '#2DDC8C', letterSpacing: 4, marginBottom: 12, textAlign: 'center' },
+  welcomeLogoCompact: { fontSize: 28, letterSpacing: 2 },
   welcomeTagline: { fontSize: fontSize.base, color: 'rgba(255,255,255,0.60)', textAlign: 'center', marginBottom: 12, lineHeight: 22 },
   welcomeHint: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.40)', textAlign: 'center', marginBottom: 24, paddingHorizontal: spacing.sm },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
-  featureCard: { width: (SCREEN_W - spacing.lg * 2 - 12) / 2, backgroundColor: '#111318', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(45,220,140,0.15)', position: 'relative' },
+  featureCard: { backgroundColor: '#111318', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(45,220,140,0.15)', position: 'relative', minHeight: 120 },
   featureCheck: { position: 'absolute', top: 10, right: 10, zIndex: 1 },
   featureCardActive: { borderColor: 'rgba(45,220,140,0.50)', backgroundColor: '#131a15' },
   featureIconWrap: { width: 44, height: 44, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginBottom: 10, backgroundColor: 'rgba(45,220,140,0.08)' },
@@ -378,7 +388,7 @@ const styles = StyleSheet.create({
 
   // Goal grid
   gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  gridTile: { width: '47%', padding: spacing.md, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', gap: spacing.sm, minHeight: 85, justifyContent: 'center', position: 'relative' },
+  gridTile: { width: '48%', padding: spacing.md, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', gap: spacing.sm, minHeight: 96, justifyContent: 'center', position: 'relative' },
   gridEmoji: { fontSize: 28 },
   gridLabel: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'center' },
   gridCheck: { position: 'absolute', top: 8, right: 8 },
@@ -407,7 +417,10 @@ const styles = StyleSheet.create({
   generatingTitle: { fontSize: 20, fontWeight: '700' },
 
   // Bottom bar
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg, paddingBottom: 36 },
+  bottomBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.2)',
+  },
   ctaBtnWrap: { borderRadius: 20, overflow: 'hidden' },
   ctaBtn: { padding: 18, alignItems: 'center' },
   ctaBtnText: { fontSize: fontSize.lg, fontWeight: '800', color: '#fff' },

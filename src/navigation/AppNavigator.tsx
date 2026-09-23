@@ -1,8 +1,8 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Platform, StatusBar, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useState } from 'react';
+import { ActivityIndicator, Platform, StatusBar, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useMemo, useState } from 'react';
 import { RadialMenu } from '../components/RadialMenu';
 import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
@@ -52,6 +52,7 @@ import MealPlanScreen from '../screens/meals/MealPlanScreen';
 
 // ── AI FOOD SCANNER ───────────────────────────────────────────
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
+import { isFitnessAssessmentComplete } from '../utils/onboardingFlags';
 
 // ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
@@ -242,8 +243,18 @@ function TabNavigator() {
 
 // ── AUTH STACK (no headers — screens have own UI) ────────────
 function AuthStack() {
+  const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
+
+  const initialRoute = useMemo(() => {
+    if (!user) return 'Welcome';
+    if (profile?.goal && !isFitnessAssessmentComplete(profile)) return 'FitnessAssessment';
+    if (!profile?.goal) return 'Onboarding';
+    return 'Welcome';
+  }, [user, profile?.goal, profile?.tracking_preferences]);
+
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+    <RootStack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
       <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
       <RootStack.Screen name="FitnessAssessment" component={FitnessAssessmentScreen} />
@@ -267,9 +278,19 @@ function AppStack() {
 
 // ── ROOT NAVIGATOR ────────────────────────────────────────────
 export default function AppNavigator() {
-  const { user, isOnboarding } = useAuthStore();
+  const { user, isOnboarding, authReady } = useAuthStore();
+  const { colorScheme } = useThemeStore();
+  const theme = colors[colorScheme];
   const showAuth = !user || isOnboarding;
   const navKey = (user && !isOnboarding) ? `authed-${user.id}` : 'guest';
+
+  if (!authReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.bg }}>
+        <ActivityIndicator size="large" color={theme.accent} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer key={navKey}>

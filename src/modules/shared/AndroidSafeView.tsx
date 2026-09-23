@@ -13,7 +13,18 @@ export function AndroidSafeView({ children, style, backgroundColor }: Props) {
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[{ flex: 1, backgroundColor, overflow: 'hidden' }, style]}>
+      <View
+        style={[
+          {
+            flex: 1,
+            backgroundColor,
+            overflow: 'hidden',
+            paddingTop: 'env(safe-area-inset-top)' as unknown as number,
+            paddingBottom: 'env(safe-area-inset-bottom)' as unknown as number,
+          },
+          style,
+        ]}
+      >
         {children}
       </View>
     );

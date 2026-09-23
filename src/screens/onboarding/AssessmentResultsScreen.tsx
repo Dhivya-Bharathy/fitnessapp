@@ -12,11 +12,20 @@ import { useAiCoachStore } from '../../store/aiCoachStore';
 import { colors, spacing, fontSize, radius } from '../../theme';
 import { generateDemicAssessmentPlan } from '../../services/openai-client';
 import { supabase } from '../../services/supabase';
+import { mergeAssessmentDonePrefs } from '../../utils/onboardingFlags';
+import { useFooterInset } from '../../hooks/useFooterInset';
+import { MOTIVATIONAL_LINES } from '../../data/fitnessAssessmentQuestions';
+import { clearAssessmentPersistence } from '../../utils/assessmentPersistence';
+import { Image } from 'react-native';
 
 export default function AssessmentResultsScreen() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
+  const footerInset = useFooterInset();
+  const footerSpace = footerInset + 80;
   const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
+  const updateProfile = useAuthStore((s) => s.updateProfile);
   const { answers, result, isGenerating, setGenerating, setResult, setError, error } = useAssessmentStore();
   const setCurrentWorkout = useAiCoachStore((s) => s.clearCurrentWorkout);
 
@@ -33,7 +42,7 @@ export default function AssessmentResultsScreen() {
       if (user?.id) {
         await supabase.from('profiles').update({
           bio: plan.coach_summary?.slice(0, 500),
-          equipment_preferences: plan.workout.demic_story_moves ?? [],
+          equipment_preferences: plan.workout.focus_moves ?? plan.workout.demic_story_moves ?? [],
         }).eq('id', user.id);
 
         try {
@@ -57,12 +66,19 @@ export default function AssessmentResultsScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  const finish = () => {
+  const finish = async () => {
     if (result?.workout) {
       useAiCoachStore.setState({ currentWorkout: result.workout, error: null });
     } else {
       setCurrentWorkout();
     }
+    if (user?.id) {
+      const tracking_preferences = mergeAssessmentDonePrefs(profile?.tracking_preferences);
+      await supabase.from('profiles').update({ tracking_preferences }).eq('id', user.id);
+      updateProfile({ tracking_preferences });
+    }
+    await clearAssessmentPersistence();
+    useAssessmentStore.getState().reset();
     useAuthStore.getState().setOnboarding(false);
   };
 
@@ -74,7 +90,7 @@ export default function AssessmentResultsScreen() {
           Building your plan…
         </Text>
         <Text style={[styles.loadingSub, { color: theme.textSecondary }]}>
-          Demic Story–style training + Indian diet via AI
+          AI training + Indian diet
         </Text>
         {error ? <Text style={{ color: '#FF5959', marginTop: spacing.md }}>{error}</Text> : null}
       </AndroidSafeView>
@@ -82,21 +98,32 @@ export default function AssessmentResultsScreen() {
   }
 
   const { workout, indian_diet_plan, coach_summary, weekly_outline } = result;
+  const focusMoves = workout.focus_moves ?? workout.demic_story_moves;
+  const tagline = MOTIVATIONAL_LINES[Math.abs(coach_summary.length) % MOTIVATIONAL_LINES.length];
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: footerSpace }]}>
+        <View style={styles.heroImageWrap}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=80' }}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <LinearGradient colors={['transparent', theme.bg]} style={styles.heroImageFade} />
+        </View>
         <LinearGradient colors={[theme.accent + '33', theme.bg]} style={styles.hero}>
           <Ionicons name="sparkles" size={32} color={theme.accent} />
           <Text style={[styles.heroTitle, { color: theme.textPrimary }]}>Your AI plan is ready</Text>
+          <Text style={[styles.heroTag, { color: theme.accent }]}>{tagline}</Text>
           <Text style={[styles.heroSub, { color: theme.textSecondary }]}>{coach_summary}</Text>
         </LinearGradient>
 
         <Text style={[styles.blockTitle, { color: theme.textPrimary }]}>
-          🏋️ Demic Story–style workout
+          🏋️ AI training session
         </Text>
         <Text style={[styles.blockSub, { color: theme.textMuted }]}>
-          Inspired by @demicstory calisthenics · {workout.duration} min
+          {workout.duration} min · built from your answers
         </Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.workoutName, { color: theme.accent }]}>{workout.title}</Text>
@@ -109,10 +136,13 @@ export default function AssessmentResultsScreen() {
               </Text>
             </View>
           ))}
-          {workout.demic_story_moves?.length ? (
+          {focusMoves?.length ? (
             <Text style={[styles.tags, { color: theme.textMuted }]}>
-              Focus moves: {workout.demic_story_moves.join(' · ')}
+              Key focus: {focusMoves.join(' · ')}
             </Text>
+          ) : null}
+          {workout.ai_notes ? (
+            <Text style={[styles.motivate, { color: theme.textSecondary }]}>{workout.ai_notes}</Text>
           ) : null}
         </View>
 
@@ -142,7 +172,7 @@ export default function AssessmentResultsScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={[styles.footer, { backgroundColor: theme.bg }]}>
+      <View style={[styles.footer, { backgroundColor: theme.bg, paddingBottom: footerInset, borderTopColor: theme.border }]}>
         <TouchableOpacity onPress={finish} activeOpacity={0.85} style={styles.ctaWrap}>
           <LinearGradient colors={[theme.accent, '#0DAE6C']} style={styles.cta}>
             <Text style={styles.ctaText}>Start Fitness App →</Text>
@@ -159,9 +189,14 @@ const styles = StyleSheet.create({
   loadingTitle: { fontSize: fontSize.xl, fontWeight: '800', marginTop: spacing.lg },
   loadingSub: { fontSize: fontSize.base, marginTop: spacing.sm, textAlign: 'center' },
   scroll: { padding: spacing.lg, paddingBottom: 120 },
+  heroImageWrap: { height: 160, borderRadius: radius.xl, overflow: 'hidden', marginBottom: spacing.md },
+  heroImage: { width: '100%', height: '100%' },
+  heroImageFade: { ...StyleSheet.absoluteFillObject },
   hero: { borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg, alignItems: 'center' },
   heroTitle: { fontSize: 22, fontWeight: '800', marginTop: spacing.sm, textAlign: 'center' },
+  heroTag: { fontSize: fontSize.sm, fontWeight: '700', marginTop: spacing.sm, textAlign: 'center' },
   heroSub: { fontSize: fontSize.base, marginTop: spacing.sm, textAlign: 'center', lineHeight: 22 },
+  motivate: { fontSize: fontSize.sm, marginTop: spacing.md, lineHeight: 20, fontStyle: 'italic' },
   blockTitle: { fontSize: fontSize.lg, fontWeight: '800', marginBottom: 4 },
   blockSub: { fontSize: fontSize.sm, marginBottom: spacing.sm },
   card: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.lg },
@@ -173,7 +208,10 @@ const styles = StyleSheet.create({
   mealRow: { marginTop: spacing.sm },
   tags: { fontSize: fontSize.xs, marginTop: spacing.md, fontStyle: 'italic' },
   outline: { fontSize: fontSize.sm, marginBottom: 4, paddingLeft: spacing.sm },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg, paddingBottom: 36 },
+  footer: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   ctaWrap: { borderRadius: 20, overflow: 'hidden' },
   cta: { padding: 18, alignItems: 'center' },
   ctaText: { color: '#fff', fontSize: fontSize.lg, fontWeight: '800' },

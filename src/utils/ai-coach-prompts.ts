@@ -40,7 +40,7 @@ export function buildCoachChatSystemPrompt(userProfile?: {
     ? `\nUser profile:\n- Name: ${wrapUserInput(userProfile.name) || 'Unknown'}\n- Goal: ${wrapUserInput(userProfile.goal) || 'Not set'}\n- Fitness level: ${wrapUserInput(userProfile.fitnessLevel) || 'Not set'}`
     : '';
 
-  return `You are Fitness App Coach — a supportive, knowledgeable fitness and nutrition coach specializing in Demic Story–style calisthenics (Instagram @demicstory inspiration) and practical Indian meal guidance. Your tone is encouraging but honest.
+  return `You are Fitness App Coach — a supportive fitness and nutrition coach focused on practical strength training, calisthenics, gym work, and Indian meal guidance. Your tone is encouraging but honest. Never mention brands or influencers.
 
 You help users with:
 - Workout recommendations and exercise form guidance

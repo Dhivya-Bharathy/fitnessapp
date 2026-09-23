@@ -1,5 +1,4 @@
 import type { AssessmentAnswers } from '../store/assessmentStore';
-import { DEMIC_STORY_SIGNATURE_MOVES, DEMIC_STORY_TRAINING_PRINCIPLES } from './demic-story-knowledge';
 
 function formatAnswers(answers: AssessmentAnswers): string {
   return Object.entries(answers)
@@ -7,15 +6,19 @@ function formatAnswers(answers: AssessmentAnswers): string {
     .join('\n');
 }
 
+function trainingDaysCount(answers: AssessmentAnswers): string {
+  const d = answers.days_per_week;
+  if (Array.isArray(d)) return String(d.length || 3);
+  return String(d ?? '3');
+}
+
 export function buildDemicAssessmentSystemPrompt(): string {
   return `You are an elite fitness coach combining:
-1) Demic Story–style athletic calisthenics (Instagram inspiration: @demicstory — bar work, bodyweight skills, conditioning)
-2) Practical Indian nutrition (regional foods, veg/non-veg, budget in INR)
+1) Practical strength training, calisthenics, and gym-based workouts tailored to the client's level
+2) Indian nutrition (regional foods, veg/non-veg, budget in INR)
 
-${DEMIC_STORY_TRAINING_PRINCIPLES}
-
-Reference signature move families when relevant: ${DEMIC_STORY_SIGNATURE_MOVES.join(', ')}.
-
+Principles: progressive overload, joint-friendly regressions, clear form cues, sustainable weekly volume.
+Never mention brands, influencers, or social media handles.
 Safety: respect injuries, suggest regressions, no medical claims.
 Output ONLY valid JSON matching the requested schema.`;
 }
@@ -27,13 +30,13 @@ ${formatAnswers(answers)}
 
 Create a personalized plan:
 
-1) **workout** — Demic Story–inspired session for their level, equipment, injuries, and days/week. Use exercise names they can film like short-form fitness content. Include warmup, 5–8 main exercises, cooldown, ai_notes referencing why moves match @demicstory style progressions.
+1) **workout** — Session for their level, equipment, injuries, and training days. Include warmup, 5–8 main exercises, cooldown, and motivating ai_notes (no brand names).
 
-2) **indian_diet_plan** — One day of Indian meals (breakfast, lunch, dinner, optional snack) with realistic home/street options, macros estimate, and ₹ budget alignment.
+2) **indian_diet_plan** — One day of Indian meals (breakfast, lunch, dinner, optional snack) with realistic home options, macros estimate, and ₹ budget alignment.
 
-3) **weekly_outline** — Array of ${answers.days_per_week ?? '3'} short strings describing each training day focus.
+3) **weekly_outline** — Array of ${trainingDaysCount(answers)} short strings describing each training day focus (use their selected weekdays when provided).
 
-4) **coach_summary** — 2–3 encouraging sentences tying training + Indian diet together.
+4) **coach_summary** — 2–3 warm, motivational sentences tying AI training + Indian diet together. No influencer or brand references.
 
 JSON schema:
 {
@@ -48,7 +51,7 @@ JSON schema:
     "exercises": [{"name":"string","sets":number,"reps":"string","rest":number,"form_tips":"string","progression":"string"}],
     "cooldown": ["string"],
     "ai_notes": "string",
-    "demic_story_moves": ["string"]
+    "focus_moves": ["string"]
   },
   "indian_diet_plan": {
     "title": "string",

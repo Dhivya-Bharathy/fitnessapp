@@ -1,6 +1,6 @@
 # fitnessapp
 
-Fitness App — AI-powered training (Demic Story–style calisthenics) and Indian diet planning, built with Expo + Supabase.
+Fitness App — AI training and Indian diet planning, built with Expo + Supabase.
 
 ## Local run
 

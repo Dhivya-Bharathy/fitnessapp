@@ -1,8 +1,9 @@
-export type AssessmentQuestionType = 'single' | 'multi' | 'text' | 'number';
+export type AssessmentQuestionType = 'single' | 'multi' | 'text' | 'number' | 'weekdays';
 
 export interface AssessmentOption {
   value: string;
   label: string;
+  icon?: string;
 }
 
 export interface AssessmentQuestion {
@@ -17,17 +18,28 @@ export interface AssessmentQuestion {
   max?: number;
 }
 
-/** 22-question intake before AI generates Demic Story–style training + Indian diet. */
+export const WEEKDAY_OPTIONS: AssessmentOption[] = [
+  { value: 'mon', label: 'Mon' },
+  { value: 'tue', label: 'Tue' },
+  { value: 'wed', label: 'Wed' },
+  { value: 'thu', label: 'Thu' },
+  { value: 'fri', label: 'Fri' },
+  { value: 'sat', label: 'Sat' },
+  { value: 'sun', label: 'Sun' },
+];
+
+/** 22-question intake before AI generates training + Indian diet plan. */
 export const FITNESS_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
   { id: 'primary_goal', section: 'Goals', question: 'What is your #1 fitness goal right now?', type: 'single', options: [
     { value: 'fat_loss', label: 'Lose fat' }, { value: 'muscle', label: 'Build muscle' }, { value: 'strength', label: 'Get stronger' },
-    { value: 'skills', label: 'Calisthenics skills (pull-ups, dips, etc.)' }, { value: 'energy', label: 'More energy & stamina' },
+    { value: 'skills', label: 'Calisthenics skills (pull-ups, dips, etc.)' }, { value: 'endurance', label: 'Endurance' },
   ]},
   { id: 'timeline', section: 'Goals', question: 'When do you want to see clear progress?', type: 'single', options: [
     { value: '4w', label: '4 weeks' }, { value: '8w', label: '8 weeks' }, { value: '12w', label: '12 weeks' }, { value: 'long', label: 'No rush — stay consistent' },
   ]},
   { id: 'experience', section: 'Training', question: 'How long have you trained consistently?', type: 'single', options: [
-    { value: 'new', label: 'Just starting' }, { value: '6m', label: 'Under 6 months' }, { value: '1y', label: '6–12 months' }, { value: '2y+', label: '1+ years' },
+    { value: 'new', label: 'Just starting' }, { value: '6-12m', label: '6–12 months' },
+    { value: '2-4y', label: 'Below 2–4 years' }, { value: '5y+', label: '5+ years' },
   ]},
   { id: 'pullups', section: 'Training', question: 'How many strict pull-ups can you do?', type: 'single', options: [
     { value: '0', label: '0' }, { value: '1-3', label: '1–3' }, { value: '4-8', label: '4–8' }, { value: '9+', label: '9+' },
@@ -35,9 +47,7 @@ export const FITNESS_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
   { id: 'pushups', section: 'Training', question: 'How many push-ups in one set?', type: 'single', options: [
     { value: '0-5', label: '0–5' }, { value: '6-15', label: '6–15' }, { value: '16-30', label: '16–30' }, { value: '31+', label: '31+' },
   ]},
-  { id: 'days_per_week', section: 'Training', question: 'How many days per week can you train?', type: 'single', options: [
-    { value: '2', label: '2 days' }, { value: '3', label: '3 days' }, { value: '4', label: '4 days' }, { value: '5', label: '5+ days' },
-  ]},
+  { id: 'days_per_week', section: 'Training', question: 'Which days can you train?', subtitle: 'Tap all days that work for you', type: 'weekdays', options: WEEKDAY_OPTIONS },
   { id: 'session_minutes', section: 'Training', question: 'Typical workout length?', type: 'single', options: [
     { value: '20', label: '20 min' }, { value: '30', label: '30 min' }, { value: '45', label: '45 min' }, { value: '60', label: '60+ min' },
   ]},
@@ -45,8 +55,12 @@ export const FITNESS_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
     { value: 'home', label: 'Home' }, { value: 'park', label: 'Outdoor / bars' }, { value: 'gym', label: 'Gym' }, { value: 'mixed', label: 'Mix of places' },
   ]},
   { id: 'equipment', section: 'Training', question: 'Equipment you have access to', subtitle: 'Select all that apply', type: 'multi', options: [
-    { value: 'bodyweight', label: 'Bodyweight only' }, { value: 'bands', label: 'Resistance bands' }, { value: 'dumbbells', label: 'Dumbbells' },
-    { value: 'pullup_bar', label: 'Pull-up bar' }, { value: 'dip_bars', label: 'Parallel bars / dips' }, { value: 'kettlebell', label: 'Kettlebell' },
+    { value: 'bodyweight', label: 'Bodyweight only', icon: 'body-outline' },
+    { value: 'bands', label: 'Resistance bands', icon: 'fitness-outline' },
+    { value: 'dumbbells', label: 'Dumbbells', icon: 'barbell-outline' },
+    { value: 'gym', label: 'Gym (full access)', icon: 'business-outline' },
+    { value: 'dip_bars', label: 'Parallel bars / dips', icon: 'git-commit-outline' },
+    { value: 'kettlebell', label: 'Kettlebell', icon: 'disc-outline' },
   ]},
   { id: 'injuries', section: 'Health', question: 'Any injuries or pain areas?', subtitle: 'Select all that apply', type: 'multi', options: [
     { value: 'none', label: 'None' }, { value: 'knee', label: 'Knees' }, { value: 'shoulder', label: 'Shoulders' }, { value: 'back', label: 'Lower back' }, { value: 'wrist', label: 'Wrists' },
@@ -80,7 +94,7 @@ export const FITNESS_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
   { id: 'water_liters', section: 'Indian diet', question: 'Water intake per day (liters)?', type: 'single', options: [
     { value: '1', label: 'Under 1L' }, { value: '2', label: '1–2L' }, { value: '3', label: '2–3L' }, { value: '3+', label: '3L+' },
   ]},
-  { id: 'demic_style', section: 'Demic Story training', question: 'Which Demic Story–style training excites you most?', subtitle: 'Inspired by @demicstory calisthenics & athletic drills', type: 'multi', options: [
+  { id: 'training_focus', section: 'AI training', question: 'Which training excites you most?', type: 'multi', options: [
     { value: 'pull_progressions', label: 'Pull-up & muscle-up progressions' }, { value: 'push_power', label: 'Push strength & handstand prep' },
     { value: 'core_skills', label: 'Core & L-sit / lever basics' }, { value: 'leg_power', label: 'Leg power & plyometrics' }, { value: 'conditioning', label: 'HIIT & conditioning finishers' },
   ]},
@@ -90,3 +104,20 @@ export const FITNESS_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
 ];
 
 export const ASSESSMENT_QUESTION_COUNT = FITNESS_ASSESSMENT_QUESTIONS.length;
+
+/** Section-themed hero images (Unsplash, free to hotlink for demo). */
+export const ASSESSMENT_SECTION_IMAGES: Record<string, string> = {
+  Goals: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80',
+  Training: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80',
+  Health: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80',
+  'Indian diet': 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=800&q=80',
+  'AI training': 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
+  Mindset: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80',
+};
+
+export const MOTIVATIONAL_LINES = [
+  'Small steps today — stronger you tomorrow.',
+  'Your plan is built for real life, not perfection.',
+  'Consistency beats intensity. You’ve got this.',
+  'Train smart. Eat well. Repeat.',
+];

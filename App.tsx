@@ -15,7 +15,7 @@ import { setupNotificationHandler } from './src/services/reminderService';
 if (Platform.OS !== 'web') setupNotificationHandler();
 
 export default function App() {
-  const { setSession, user } = useAuthStore();
+  const { setSession, user, loadProfile } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const [fontTimeout, setFontTimeout] = useState(false);
@@ -43,8 +43,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let mounted = true;
+    (async () => {
+      useAuthStore.setState({ authReady: false });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
       setSession(session);
+      if (session?.user) {
+        await loadProfile(session.user.id);
+      }
+      if (mounted) useAuthStore.setState({ authReady: true });
+
       if (session?.user) {
         setTimeout(async () => {
           try {
@@ -57,12 +66,18 @@ export default function App() {
           } catch {}
         }, 3000);
       }
-    });
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) {
+        loadProfile(session.user.id).catch(() => {});
+      }
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (Platform.OS === 'web' && fontsError) {

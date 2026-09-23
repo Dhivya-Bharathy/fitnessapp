@@ -6,7 +6,10 @@ import { Profile } from '../services/profileService';
 /** Authentication and user profile state managed by the auth store. */
 interface AuthState {
   user: User | null; session: Session | null; profile: Profile | null;
-  isLoading: boolean; isAuthenticated: boolean; isOnboarding: boolean;
+  isLoading: boolean;
+  /** False until getSession + loadProfile finish on cold start. */
+  authReady: boolean;
+  isAuthenticated: boolean; isOnboarding: boolean;
   userTier: 'free' | 'pro' | 'premium';  liveSteps: number;
   setLiveSteps: (steps: number) => void;
   setSession: (session: Session | null) => void;
@@ -21,7 +24,7 @@ interface AuthState {
 
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null, session: null, profile: null, isLoading: false,
+  user: null, session: null, profile: null, isLoading: false, authReady: false,
   isAuthenticated: false, isOnboarding: false, userTier: 'free',
   liveSteps: 0,
 
@@ -50,14 +53,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (profile) {
         set({ profile });
+      }
 
-        if (!get().isOnboarding) {
-          if (!profile.goal) {
-            set({ isOnboarding: true });
-          }
-        }
-      } else {
-        if (!get().isOnboarding) {
+      if (!get().isOnboarding) {
+        const { isFitnessAssessmentComplete } = await import('../utils/onboardingFlags');
+        if (!profile || !isFitnessAssessmentComplete(profile)) {
           set({ isOnboarding: true });
         }
       }
