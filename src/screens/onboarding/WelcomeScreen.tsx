@@ -10,6 +10,9 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { useIsCompactPhone } from '../../hooks/useLayoutWidth';
 import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
 import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
+import { useAuthStore } from '../../store/authStore';
+import { shouldShowOnboardingFlow } from '../../utils/authGate';
+import { isFitnessAssessmentComplete } from '../../utils/onboardingFlags';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<any>();
@@ -30,7 +33,22 @@ export default function WelcomeScreen() {
       footer={
         <PrimaryCTA
           label="Get Started"
-          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] })}
+          onPress={() => {
+            const { user, profile, forceAssessmentRetake } = useAuthStore.getState();
+            if (
+              user
+              && profile?.goal
+              && (forceAssessmentRetake || !isFitnessAssessmentComplete(profile))
+            ) {
+              navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
+              return;
+            }
+            if (shouldShowOnboardingFlow(user, profile, { forceAssessmentRetake })) {
+              navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+              return;
+            }
+            navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+          }}
         />
       }
     >

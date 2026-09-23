@@ -108,22 +108,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ profile });
       }
 
-      if (get().forceAssessmentRetake) {
-        set({ isOnboarding: true });
-        return profile;
-      }
-
-      if (!get().isOnboarding) {
-        const { isAssessmentCompleteForUser } = await import('../utils/onboardingFlags');
-        const complete = await isAssessmentCompleteForUser(userId, profile, {
-          forceRetake: get().forceAssessmentRetake,
-        });
-        if (get().forceAssessmentRetake || !profile?.goal || !complete) {
-          set({ isOnboarding: true });
-        } else {
-          set({ isOnboarding: false });
-        }
-      }
+      const { isAssessmentCompleteForUser } = await import('../utils/onboardingFlags');
+      const force = get().forceAssessmentRetake;
+      const complete = await isAssessmentCompleteForUser(userId, profile, { forceRetake: force });
+      const showFlow = !get().user || force || !profile?.goal || !complete;
+      set({ isOnboarding: showFlow });
 
       return profile;
     } catch (e) {
@@ -188,10 +177,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   deleteAccount: async () => {
     const userId = get().user?.id;
 
-    const { resetLocalUserState, clearSupabaseAuthStorage } = await import('../utils/resetLocalUserState');
     const { persistForceAssessmentRetake } = await import('../utils/onboardingFlags');
-    await resetLocalUserState();
     await persistForceAssessmentRetake(true);
+    set({ forceAssessmentRetake: true, isOnboarding: true });
+
+    const { resetLocalUserState, clearSupabaseAuthStorage } = await import('../utils/resetLocalUserState');
+    await resetLocalUserState();
 
     if (userId) {
       const { deleteAccountData } = await import('../services/profileService');

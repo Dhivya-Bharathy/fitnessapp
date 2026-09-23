@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { isFitnessAssessmentComplete } from '../../utils/onboardingFlags';
 const ALL_FEATURES = [
   'Unlimited AI Coach prompts',
   'Food scanner (AI vision)',
@@ -76,16 +77,23 @@ export default function SubscriptionScreen() {
   }
 };
 
+  const finishOnboardingIfAllowed = () => {
+    const { profile, forceAssessmentRetake } = useAuthStore.getState();
+    if (forceAssessmentRetake || !isFitnessAssessmentComplete(profile)) {
+      return;
+    }
+    setOnboarding(false);
+  };
+
   const handleSubscribe = async (tier: typeof TIERS[0]) => {
     if (tier.id === 'free') {
-      setOnboarding(false);
+      finishOnboardingIfAllowed();
       return;
     }
     setSelectedTier(tier.id);
-    // Simulate a brief selection animation, then continue
     setTimeout(() => {
       setSelectedTier(null);
-      setOnboarding(false);
+      finishOnboardingIfAllowed();
     }, 600);
   };
 
@@ -202,7 +210,7 @@ export default function SubscriptionScreen() {
           {/* Skip to free — only shown when coming from onboarding paywall */}
           {fromOnboarding && (
             <TouchableOpacity
-             onPress={() => setOnboarding(false)}
+             onPress={finishOnboardingIfAllowed}
                style={styles.skipBtn}
      >
             <Text style={[styles.skipText, { color: theme.textMuted }]}>

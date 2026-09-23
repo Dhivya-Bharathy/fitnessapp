@@ -53,6 +53,7 @@ import MealPlanScreen from '../screens/meals/MealPlanScreen';
 // ── AI FOOD SCANNER ───────────────────────────────────────────
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 import { isFitnessAssessmentComplete, getLocalAssessmentComplete } from '../utils/onboardingFlags';
+import { shouldShowOnboardingFlow } from '../utils/authGate';
 
 // ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
@@ -321,11 +322,12 @@ function AppStack() {
 
 // ── ROOT NAVIGATOR ────────────────────────────────────────────
 export default function AppNavigator() {
-  const { user, isOnboarding, authReady } = useAuthStore();
+  const { user, profile, authReady } = useAuthStore();
+  const forceAssessmentRetake = useAuthStore((s) => s.forceAssessmentRetake);
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const authEpoch = useAuthStore((s) => s.authEpoch);
-  const showAuth = !user || isOnboarding;
+  const showAuth = shouldShowOnboardingFlow(user, profile, { forceAssessmentRetake });
   const navKey = `nav-${authEpoch}-${user?.id ?? 'guest'}`;
 
   if (!authReady) {
