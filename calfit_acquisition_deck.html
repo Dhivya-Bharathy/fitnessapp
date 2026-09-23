@@ -1,0 +1,601 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+
+.deck { max-width: 860px; margin: 0 auto; padding: 2rem 1rem; }
+
+.slide {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 2.5rem 2.5rem 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.slide-number {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+.slide h1 { font-size: 32px; font-weight: 500; color: var(--color-text-primary); line-height: 1.2; margin-bottom: 0.5rem; }
+.slide h2 { font-size: 20px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 1rem; }
+.slide h3 { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 0.5rem; }
+
+.tagline { font-size: 15px; color: var(--color-text-secondary); margin-bottom: 2rem; line-height: 1.6; }
+.body-text { font-size: 14px; color: var(--color-text-secondary); line-height: 1.7; margin-bottom: 0.75rem; }
+
+.accent-bar {
+  width: 36px; height: 3px;
+  background: #0DAE6C;
+  border-radius: 2px;
+  margin-bottom: 1.5rem;
+}
+
+.hero-slide { background: #08061A; }
+.hero-slide .slide-number { color: rgba(255,255,255,0.3); }
+.hero-slide h1 { color: #fff; font-size: 40px; }
+.hero-slide .tagline { color: rgba(255,255,255,0.6); font-size: 17px; }
+.hero-slide .accent-bar { background: #0DAE6C; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 100px;
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+.badge-green { background: #E1F5EE; color: #085041; }
+.badge-blue { background: #E6F1FB; color: #0C447C; }
+.badge-purple { background: #EEEDFE; color: #3C3489; }
+.badge-amber { background: #FAEEDA; color: #633806; }
+.badge-gray { background: var(--color-background-secondary); color: var(--color-text-secondary); border: 0.5px solid var(--color-border-tertiary); }
+
+.status-row { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+.status-item {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1rem;
+  flex: 1; min-width: 140px;
+}
+.status-item .label { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.status-item .value { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem; }
+.three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem; }
+.four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem; }
+
+.feature-card {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 1rem;
+}
+.feature-card .icon { font-size: 18px; color: #0DAE6C; margin-bottom: 8px; }
+.feature-card h3 { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+.feature-card p { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+
+.pain-item { display: flex; gap: 12px; margin-bottom: 1rem; align-items: flex-start; }
+.pain-dot { width: 6px; height: 6px; background: #D85A30; border-radius: 50%; margin-top: 7px; flex-shrink: 0; }
+.pain-text { font-size: 14px; color: var(--color-text-secondary); line-height: 1.6; }
+.pain-text strong { color: var(--color-text-primary); font-weight: 500; }
+
+.check-item { display: flex; gap: 12px; margin-bottom: 0.75rem; align-items: flex-start; }
+.check-icon { font-size: 14px; color: #0DAE6C; margin-top: 2px; flex-shrink: 0; }
+.check-text { font-size: 14px; color: var(--color-text-secondary); line-height: 1.6; }
+.check-text strong { color: var(--color-text-primary); font-weight: 500; }
+
+.tech-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+.tech-item {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1rem;
+}
+.tech-item .tech-label { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.tech-item .tech-value { font-size: 13px; color: var(--color-text-primary); font-weight: 500; line-height: 1.5; }
+
+.cost-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: center; padding: 0.75rem 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.cost-row:last-child { border-bottom: none; }
+.cost-label { font-size: 14px; color: var(--color-text-primary); }
+.cost-time { font-size: 13px; color: var(--color-text-secondary); }
+.cost-price { font-size: 13px; color: var(--color-text-secondary); }
+.cost-note { font-size: 11px; color: var(--color-text-tertiary); }
+
+.total-box {
+  background: #08061A;
+  border-radius: var(--border-radius-md);
+  padding: 1.25rem 1.5rem;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 1rem;
+}
+.total-box .label { font-size: 13px; color: rgba(255,255,255,0.6); }
+.total-box .amount { font-size: 28px; font-weight: 500; color: #34D98A; }
+
+.timeline-item { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-start; }
+.timeline-dot { width: 8px; height: 8px; background: #0DAE6C; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.timeline-line { width: 1px; background: var(--color-border-tertiary); flex-shrink: 0; }
+
+.big-stat { font-size: 42px; font-weight: 500; color: var(--color-text-primary); line-height: 1; }
+.big-stat-label { font-size: 13px; color: var(--color-text-secondary); margin-top: 4px; }
+
+.cta-box {
+  background: #08061A;
+  border-radius: var(--border-radius-lg);
+  padding: 2.5rem;
+  text-align: center;
+}
+.cta-box h2 { color: #fff; font-size: 24px; font-weight: 500; margin-bottom: 0.75rem; }
+.cta-box p { color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 1.5rem; }
+.cta-email {
+  display: inline-block;
+  background: #0DAE6C;
+  color: #fff;
+  padding: 0.75rem 2rem;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 1.5rem 0; }
+
+.weakness-note {
+  background: #FAEEDA;
+  border: 0.5px solid #FAC775;
+  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 13px;
+  color: #633806;
+  margin-top: 0.75rem;
+}
+.weakness-note strong { font-weight: 500; }
+
+.screen-count { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; }
+.screen-pill {
+  font-size: 12px; font-weight: 500;
+  padding: 4px 12px; border-radius: 100px;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 600px) {
+  .slide { padding: 1.5rem 1.25rem; }
+  .two-col, .three-col, .four-col { grid-template-columns: 1fr 1fr; }
+  .cost-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+
+<div class="deck">
+
+<div class="slide hero-slide">
+  <span class="slide-number">01 — Product overview</span>
+  <div class="accent-bar"></div>
+  <h1>CalFit</h1>
+  <p class="tagline">AI-powered fitness and nutrition coach for mobile, Android, iOS, and Web — built and ready to ship.</p>
+  <p style="font-size:14px; color:rgba(255,255,255,0.45); margin-bottom:1.5rem; line-height:1.6;">A fully built cross-platform fitness app with AI workout generation, AI meal planning, food scanning via vision AI, voice coaching, accountability partners, and deep health tracking. All in one codebase.</p>
+  <div class="status-row">
+    <div class="status-item" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">
+      <div class="label" style="color:rgba(255,255,255,0.3);">Category</div>
+      <div class="value" style="color:#fff;">Health & Fitness</div>
+    </div>
+    <div class="status-item" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">
+      <div class="label" style="color:rgba(255,255,255,0.3);">Platform</div>
+      <div class="value" style="color:#fff;">iOS · Android · Web</div>
+    </div>
+    <div class="status-item" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">
+      <div class="label" style="color:rgba(255,255,255,0.3);">Status</div>
+      <div class="value" style="color:#34D98A;">Complete MVP</div>
+    </div>
+    <div class="status-item" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">
+      <div class="label" style="color:rgba(255,255,255,0.3);">Revenue</div>
+      <div class="value" style="color:#fff;">Pre-revenue</div>
+    </div>
+  </div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">02 — The problem</span>
+  <div class="accent-bar"></div>
+  <h2>Most fitness apps are trackers, not coaches.</h2>
+  <p class="body-text" style="margin-bottom:1.5rem;">The apps people use today are either feature-thin or expensive — and none of them do AI-first coaching at the depth users actually need.</p>
+
+  <div class="pain-item"><div class="pain-dot"></div><div class="pain-text"><strong>Generic workouts.</strong> Most apps give static plans that don't adapt to equipment, fitness level, or available time.</div></div>
+  <div class="pain-item"><div class="pain-dot"></div><div class="pain-text"><strong>Food logging is a chore.</strong> Manually searching databases is slow and inaccurate. Users abandon after a few days.</div></div>
+  <div class="pain-item"><div class="pain-dot"></div><div class="pain-text"><strong>No real coaching.</strong> Chat-based AI coaches in existing apps are surface-level or locked behind expensive subscriptions.</div></div>
+  <div class="pain-item"><div class="pain-dot"></div><div class="pain-text"><strong>No local context.</strong> Global apps ignore regional food databases — a Nigerian user logging "Jollof Rice" gets no results, or wrong macros.</div></div>
+  <div class="pain-item"><div class="pain-dot"></div><div class="pain-text"><strong>Solo tracking doesn't stick.</strong> Fitness is behavioral. Without accountability, most users quit within 2 weeks.</div></div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">03 — The solution</span>
+  <div class="accent-bar"></div>
+  <h2>An AI-first fitness app that does the thinking for the user.</h2>
+  <p class="body-text" style="margin-bottom:1.5rem;">CalFit replaces static plans with live AI generation — workouts, meal plans, food recognition, and conversational coaching all generated on demand, personalized to the user's goals, equipment, and dietary context.</p>
+
+  <div class="three-col">
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-robot" aria-hidden="true"></i></div>
+      <h3>Generate, don't prescribe</h3>
+      <p>AI builds a custom workout or meal plan in seconds based on what the user has, wants, and can do.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-camera" aria-hidden="true"></i></div>
+      <h3>Scan food with the camera</h3>
+      <p>Point the phone at a meal. Vision AI identifies the food and estimates macros — no typing needed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-users" aria-hidden="true"></i></div>
+      <h3>Built-in accountability</h3>
+      <p>Partner system with shared streaks, side-by-side dashboards, and real-time chat keeps users consistent.</p>
+    </div>
+  </div>
+
+  <div class="check-item" style="margin-top:1.5rem;"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">No sign-up required — anonymous auth gets users into the app in under 30 seconds.</div></div>
+  <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Localized for Nigerian users with a 25-entry local food database and regionally-aware AI prompting.</div></div>
+  <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Voice input for the AI coach via Deepgram STT. Voice output with TTS workout cues during sessions.</div></div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">04 — Product walkthrough</span>
+  <div class="accent-bar"></div>
+  <h2>23 screens. One cohesive experience.</h2>
+  <p class="body-text">The app ships with a complete, navigable product — not a prototype. Every screen shown below is built, functional, and connects to live data.</p>
+
+  <div class="screen-count">
+    <span class="screen-pill">Welcome</span><span class="screen-pill">Onboarding (5 steps)</span><span class="screen-pill">Subscription</span>
+    <span class="screen-pill">Dashboard (Home)</span><span class="screen-pill">Calories & Nutrition</span><span class="screen-pill">AI Coach</span>
+    <span class="screen-pill">Workout Library</span><span class="screen-pill">Quick Start (active session)</span><span class="screen-pill">Workout Analysis</span>
+    <span class="screen-pill">Meal Plans</span><span class="screen-pill">Food Scanner</span><span class="screen-pill">Sleep Tracker</span>
+    <span class="screen-pill">Body Measurements</span><span class="screen-pill">Intermittent Fasting</span><span class="screen-pill">Progress & Analytics</span>
+    <span class="screen-pill">Recap Cards</span><span class="screen-pill">Streaks & Milestones</span><span class="screen-pill">Accountability Partners</span>
+    <span class="screen-pill">Partner Chat</span><span class="screen-pill">Journal / Notes</span><span class="screen-pill">Notifications</span>
+    <span class="screen-pill">Settings</span><span class="screen-pill">Edit Profile</span>
+  </div>
+
+  <hr class="divider">
+
+  <p class="body-text">Core user journey: <strong>Open app → Complete 5-step onboarding → Dashboard → Generate AI workout → Start session with voice cues → Log food (or scan it) → Review progress → Invite accountability partner.</strong> Each step is connected end-to-end.</p>
+</div>
+
+<div class="slide">
+  <span class="slide-number">05 — Features</span>
+  <div class="accent-bar"></div>
+  <h2>Feature depth across 10 categories.</h2>
+
+  <div class="four-col">
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-brain" aria-hidden="true"></i></div>
+      <h3>AI Workout Gen</h3>
+      <p>Level, goal, duration, equipment inputs. Warmup, exercises, cooldown. Save and regenerate.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-salad" aria-hidden="true"></i></div>
+      <h3>AI Meal Plans</h3>
+      <p>7-step questionnaire. Goal, budget, cuisine, dietary restrictions, calorie target. Nigerian food-aware.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-message-chatbot" aria-hidden="true"></i></div>
+      <h3>AI Chat Coach</h3>
+      <p>Persistent chat history. Voice input. Inline workout generation from chat commands.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-scan" aria-hidden="true"></i></div>
+      <h3>Food Scanner</h3>
+      <p>Camera or gallery. Vision AI (Llama 3.2 90B). Returns macros and logs directly to the meal.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-chart-line" aria-hidden="true"></i></div>
+      <h3>Progress Analytics</h3>
+      <p>Week/month/quarter/year views. Calorie, workout, sleep, step, weight charts. PDF export.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-users" aria-hidden="true"></i></div>
+      <h3>Accountability</h3>
+      <p>Up to 3 partners. Shared streak dashboard. Real-time chat via Supabase Realtime.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-flame" aria-hidden="true"></i></div>
+      <h3>Streaks & Gamification</h3>
+      <p>Daily check-ins. Milestone badges at 3, 7, 14, 30, 60, 90, 180, 365 days. Push reminders.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-moon" aria-hidden="true"></i></div>
+      <h3>Health Tracking</h3>
+      <p>Sleep logs. Step pedometer. Body measurements. Intermittent fasting timer. Water intake.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:1.5rem;">
+    <span class="badge badge-green">48 exercises across 8 categories</span>
+    <span class="badge badge-blue">25 Nigerian local foods</span>
+    <span class="badge badge-purple">9 notification types</span>
+    <span class="badge badge-amber">5 fasting protocols</span>
+    <span class="badge badge-green">5 shareable recap templates</span>
+    <span class="badge badge-blue">Light + dark mode</span>
+  </div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">06 — Technology stack</span>
+  <div class="accent-bar"></div>
+  <h2>Modern, maintainable, cross-platform.</h2>
+  <p class="body-text" style="margin-bottom:1.5rem;">The entire app ships from a single TypeScript codebase to iOS, Android, and Web.</p>
+
+  <div class="tech-row">
+    <div class="tech-item">
+      <div class="tech-label">Frontend</div>
+      <div class="tech-value">React Native 0.81.5<br>Expo SDK 54<br>TypeScript 5.9</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">State</div>
+      <div class="tech-value">Zustand<br>4 stores (auth, theme, AI coach, meal plan)</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">Backend & DB</div>
+      <div class="tech-value">Supabase<br>PostgreSQL · Auth · Realtime<br>Edge Functions · Storage</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">AI — Text</div>
+      <div class="tech-value">NVIDIA Llama 3.1 70B<br>Workout gen, meal plans, chat coaching</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">AI — Vision</div>
+      <div class="tech-value">NVIDIA Llama 3.2 90B<br>Food scanner / camera recognition</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">Voice</div>
+      <div class="tech-value">Deepgram STT<br>expo-speech TTS (workout cues)</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">Auth</div>
+      <div class="tech-value">Anonymous auth (no email/password)<br>SecureStore (native) · localStorage (web)</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">Food Data</div>
+      <div class="tech-value">Open Food Facts API<br>Nigerian food DB (25 entries)<br>NVIDIA fallback</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">Notifications</div>
+      <div class="tech-value">expo-notifications<br>Scheduled local + in-app inbox</div>
+    </div>
+    <div class="tech-item">
+      <div class="tech-label">Monetization</div>
+      <div class="tech-value">3-tier subscription UI built<br>IAP-ready (not yet active)</div>
+    </div>
+  </div>
+
+  <div class="check-item" style="margin-top:1.5rem;"><div class="check-icon"><i class="ti ti-shield-check" aria-hidden="true"></i></div><div class="check-text">All AI calls proxied through Supabase Edge Functions — API keys never exposed to the client. Retry logic with exponential backoff. API usage logged.</div></div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">07 — Development completed</span>
+  <div class="accent-bar"></div>
+  <h2>What's already built.</h2>
+  <p class="body-text" style="margin-bottom:1.5rem;">This is not a wireframe or concept. Every item below is implemented and functional.</p>
+
+  <div class="two-col">
+    <div>
+      <h3 style="margin-bottom:0.75rem; color: var(--color-text-secondary); font-size:12px; text-transform:uppercase; letter-spacing:0.06em;">Core product</h3>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Full auth + onboarding flow (5-step wizard)</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Dashboard with live stats, carousels, and smart banners</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">48-exercise library with illustrations, instructions, and categories</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Active workout session with TTS voice cues and auto-advance</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">AI workout + meal plan generation (full UI + backend)</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">AI chat coach with voice input and persistent history</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Camera food scanner (vision AI via Edge Function)</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Calorie, macro, water, step tracking</div></div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:0.75rem; color: var(--color-text-secondary); font-size:12px; text-transform:uppercase; letter-spacing:0.06em;">Systems & infrastructure</h3>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">17-table Supabase schema fully defined</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">2 Edge Functions (ai-proxy, deepgram-proxy)</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Sleep, body measurements, intermittent fasting</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Accountability partners + real-time partner chat</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Streaks, milestones, and gamification system</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Progress analytics + PDF export</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">Full design system (light + dark, tokens, typography)</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-check" aria-hidden="true"></i></div><div class="check-text">3-tier subscription UI (IAP-ready, not yet live)</div></div>
+    </div>
+  </div>
+
+  <div class="weakness-note" style="margin-top:1.5rem;">
+    <strong>Known gaps:</strong> IAP (in-app purchases) not yet connected to a payment processor. Server-side account deletion not implemented. Currently pre-revenue. These are documented, not hidden.
+  </div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">08 — Assets included in sale</span>
+  <div class="accent-bar"></div>
+  <h2>Everything transfers to the buyer.</h2>
+
+  <div class="two-col" style="margin-top:1.25rem;">
+    <div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-code" aria-hidden="true"></i></div><div class="check-text"><strong>Full source code</strong> — React Native / Expo / TypeScript codebase. All screens, services, and stores.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-database" aria-hidden="true"></i></div><div class="check-text"><strong>Supabase project</strong> — 17-table schema, 2 Edge Functions, Storage configuration, Row Level Security policies.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-file-text" aria-hidden="true"></i></div><div class="check-text"><strong>Full documentation</strong> — 23-section technical reference covering every screen, service, schema, and data flow.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-palette" aria-hidden="true"></i></div><div class="check-text"><strong>Design system</strong> — Complete token system: colors, typography (Plus Jakarta Sans), spacing, radius, shadow presets.</div></div>
+    </div>
+    <div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-brand-github" aria-hidden="true"></i></div><div class="check-text"><strong>Git repository</strong> — Full commit history. Clean branching structure.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-api" aria-hidden="true"></i></div><div class="check-text"><strong>API integrations</strong> — NVIDIA (Llama 3.1 70B + 3.2 90B Vision), Deepgram, Open Food Facts, Supabase — all wired and proxied.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-device-mobile" aria-hidden="true"></i></div><div class="check-text"><strong>Expo build config</strong> — Ready for App Store and Google Play submission via EAS Build.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-transfer" aria-hidden="true"></i></div><div class="check-text"><strong>Handover support</strong> — Developer available for transition calls and technical Q&A during transfer period.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">09 — Why buy instead of build</span>
+  <div class="accent-bar"></div>
+  <h2>Estimated replacement cost: $28,000–$47,000+</h2>
+  <p class="body-text" style="margin-bottom:1.5rem;">These are conservative market-rate estimates for a senior developer and designer producing the same scope from scratch. They do not include infrastructure setup time or AI integration debugging.</p>
+
+  <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden;">
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; background:var(--color-background-secondary); padding: 0.5rem 1rem;">
+      <span style="font-size:11px; font-weight:500; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.06em;">Component</span>
+      <span style="font-size:11px; font-weight:500; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.06em;">Est. time</span>
+      <span style="font-size:11px; font-weight:500; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.06em;">Est. cost ($75–100/hr)</span>
+    </div>
+    <div style="padding: 0 1rem;">
+      <div class="cost-row"><span class="cost-label">Cross-platform app architecture</span><span class="cost-time">2–3 weeks</span><span class="cost-price">$3,000–$6,000</span></div>
+      <div class="cost-row"><span class="cost-label">23 screens (UI/UX + logic)</span><span class="cost-time">8–12 weeks</span><span class="cost-price">$12,000–$18,000</span></div>
+      <div class="cost-row"><span class="cost-label">AI integrations (3 models + proxies)</span><span class="cost-time">2–4 weeks</span><span class="cost-price">$3,000–$6,000</span></div>
+      <div class="cost-row"><span class="cost-label">Supabase schema + Edge Functions</span><span class="cost-time">1–2 weeks</span><span class="cost-price">$1,500–$3,000</span></div>
+      <div class="cost-row"><span class="cost-label">Voice (STT + TTS) integration</span><span class="cost-time">1 week</span><span class="cost-price">$1,500–$2,000</span></div>
+      <div class="cost-row"><span class="cost-label">Real-time partner system + chat</span><span class="cost-time">1–2 weeks</span><span class="cost-price">$1,500–$3,000</span></div>
+      <div class="cost-row"><span class="cost-label">Design system + light/dark mode</span><span class="cost-time">1–2 weeks</span><span class="cost-price">$2,000–$4,000</span></div>
+      <div class="cost-row"><span class="cost-label">QA, testing, store prep</span><span class="cost-time">2 weeks</span><span class="cost-price">$3,000–$5,000</span></div>
+    </div>
+  </div>
+
+  <div class="total-box">
+    <div>
+      <div class="label">Estimated time to rebuild from scratch</div>
+      <div style="font-size:13px; color:rgba(255,255,255,0.4); margin-top:2px;">18–28 weeks with a senior developer + designer</div>
+    </div>
+    <div>
+      <div class="label" style="text-align:right;">Total replacement cost</div>
+      <div class="amount">$28k–$47k+</div>
+    </div>
+  </div>
+
+  <p class="body-text" style="margin-top:1rem; font-size:13px;">Acquiring CalFit means skipping the build entirely. A buyer gets a working, documented, deployable product — not a spec.</p>
+</div>
+
+<div class="slide">
+  <span class="slide-number">10 — Expansion opportunities</span>
+  <div class="accent-bar"></div>
+  <h2>The hard part is done. What's left is growth.</h2>
+
+  <div class="two-col" style="margin-top:1.25rem;">
+    <div>
+      <h3 style="font-size:13px; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.75rem;">Monetization</h3>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-credit-card" aria-hidden="true"></i></div><div class="check-text"><strong>In-app subscriptions</strong> — Tier UI already built. Connect RevenueCat or a native IAP provider. Estimated 1–2 days to activate.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-ad-2" aria-hidden="true"></i></div><div class="check-text"><strong>AdMob integration</strong> — Add banner or interstitial ads to the free tier. Expo has a supported plugin.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-building-store" aria-hidden="true"></i></div><div class="check-text"><strong>Brand partnerships</strong> — Sponsored meal plans or workout programs from gyms, nutritionists, or supplement brands.</div></div>
+    </div>
+    <div>
+      <h3 style="font-size:13px; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.75rem;">Product expansion</h3>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-globe" aria-hidden="true"></i></div><div class="check-text"><strong>Localization to other markets</strong> — The Nigerian food database pattern is repeatable. Ghana, Kenya, India, Southeast Asia.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-watch" aria-hidden="true"></i></div><div class="check-text"><strong>Wearable integration</strong> — Apple Watch / Wear OS for live workout tracking and health data sync.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-barcode" aria-hidden="true"></i></div><div class="check-text"><strong>Barcode food scanning</strong> — Extend the food scanner with barcode lookup via Open Food Facts (already integrated).</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-users-group" aria-hidden="true"></i></div><div class="check-text"><strong>Group challenges</strong> — Extend the partner system to group fitness challenges, leaderboards, team goals.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">11 — Ideal buyer</span>
+  <div class="accent-bar"></div>
+  <h2>Who this acquisition makes sense for.</h2>
+
+  <div class="three-col" style="margin-top:1.25rem;">
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-rocket" aria-hidden="true"></i></div>
+      <h3>Startup founders</h3>
+      <p>Launching a health or wellness product and need a working foundation — not a 6-month build cycle.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-building" aria-hidden="true"></i></div>
+      <h3>Agencies & studios</h3>
+      <p>A client wants a fitness app. Instead of quoting from scratch, start with a complete, documented codebase.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-device-mobile" aria-hidden="true"></i></div>
+      <h3>App operators</h3>
+      <p>Running a portfolio of mobile products and looking for a ready-to-monetize fitness asset.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-heart" aria-hidden="true"></i></div>
+      <h3>Fitness brands</h3>
+      <p>A gym chain, nutritionist platform, or supplement brand wanting a white-labeled companion app.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-map-pin" aria-hidden="true"></i></div>
+      <h3>African market operators</h3>
+      <p>A product built with West African food culture already embedded — rare in the fitness app market.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"><i class="ti ti-code" aria-hidden="true"></i></div>
+      <h3>Developer entrepreneurs</h3>
+      <p>A solo developer or small team who wants to ship a polished product rather than build from zero.</p>
+    </div>
+  </div>
+</div>
+
+<div class="slide">
+  <span class="slide-number">12 — Acquisition details</span>
+  <div class="accent-bar"></div>
+  <h2>What transfers. How it works.</h2>
+
+  <div class="two-col" style="margin-top:1.25rem;">
+    <div>
+      <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-secondary); margin-bottom:0.75rem;">Assets transferred</h3>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-transfer" aria-hidden="true"></i></div><div class="check-text">Full source code repository (GitHub transfer or ZIP)</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-transfer" aria-hidden="true"></i></div><div class="check-text">Supabase project ownership transfer</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-transfer" aria-hidden="true"></i></div><div class="check-text">API credentials and integration configs</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-transfer" aria-hidden="true"></i></div><div class="check-text">All documentation and design assets</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-transfer" aria-hidden="true"></i></div><div class="check-text">Expo project config and EAS build setup</div></div>
+    </div>
+    <div>
+      <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-text-secondary); margin-bottom:0.75rem;">Transition process</h3>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-circle-number-1" aria-hidden="true"></i></div><div class="check-text"><strong>Intro call</strong> — Walkthrough of the codebase, architecture, and all open questions.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-circle-number-2" aria-hidden="true"></i></div><div class="check-text"><strong>Agreement signed</strong> — Transfer begins within 48 hours of payment confirmation.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-circle-number-3" aria-hidden="true"></i></div><div class="check-text"><strong>Handover call</strong> — Developer walks buyer through setup, deployment, and any customization notes.</div></div>
+      <div class="check-item"><div class="check-icon"><i class="ti ti-circle-number-4" aria-hidden="true"></i></div><div class="check-text"><strong>Support window</strong> — 2-week post-transfer Q&A availability from developer.</div></div>
+    </div>
+  </div>
+
+  <div class="status-row" style="margin-top:1rem;">
+    <div class="status-item">
+      <div class="label">Estimated handover time</div>
+      <div class="value">3–5 business days</div>
+    </div>
+    <div class="status-item">
+      <div class="label">Support window</div>
+      <div class="value">2 weeks post-transfer</div>
+    </div>
+    <div class="status-item">
+      <div class="label">Exclusivity</div>
+      <div class="value">Full IP transfer</div>
+    </div>
+  </div>
+</div>
+
+<div class="slide" style="padding:0; overflow:hidden; border:none; background: transparent;">
+  <div class="cta-box">
+    <span class="slide-number" style="color:rgba(255,255,255,0.3); margin-bottom:2rem; display:block;">13 — Contact</span>
+    <h2>Interested in acquiring CalFit?</h2>
+    <p>Send an offer or inquiry to the developer. Include your intended use case, any questions about the codebase, and your offer range. All serious inquiries receive a response within 24 hours.</p>
+    <a href="mailto:aotnetworklabs@gmail.com" class="cta-email">aotnetworklabs@gmail.com</a>
+    <div style="margin-top:2rem; display:flex; gap:1.5rem; justify-content:center; flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:11px; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Developer</div>
+        <div style="font-size:14px; color:rgba(255,255,255,0.8);">AOT Network</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:11px; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Portfolio</div>
+        <div style="font-size:14px; color:#34D98A;">aot-network-portfolio.vercel.app</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:11px; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">GitHub</div>
+        <div style="font-size:14px; color:#34D98A;">github.com/adiiaot</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
