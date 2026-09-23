@@ -43,6 +43,20 @@ function netlifyOrigin(): string | null {
   return null;
 }
 
+function isNetlifyProductionOrigin(origin: string): boolean {
+  return /netlify\.app|\.netlify\.live/i.test(origin);
+}
+
+/** LAN / local proxy URLs must not be used on public Netlify web builds. */
+function isPrivateOrLocalProxyBase(base: string): boolean {
+  const b = base.toLowerCase();
+  if (b.includes('localhost') || b.includes('127.0.0.1')) return true;
+  if (/^https?:\/\/10\.\d+\.\d+\.\d+/i.test(b)) return true;
+  if (/^https?:\/\/192\.168\.\d+\.\d+/i.test(b)) return true;
+  if (/^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+/i.test(b)) return true;
+  return isLocalProxyBase(base);
+}
+
 /** Same LAN IP as Metro / Expo web — phone can reach proxy without editing .env. */
 function devProxyFromBundlerHost(): string | null {
   if (!__DEV__) return null;
@@ -72,15 +86,23 @@ function devProxyFromBundlerHost(): string | null {
 /** Local proxy base URLs (no trailing slash). */
 export function openAiProxyBaseUrls(): string[] {
   const list: string[] = [];
-  if (PROXY_ENV) list.push(PROXY_ENV);
+  const origin = netlifyOrigin();
+  const onNetlifyProd = Boolean(origin && isNetlifyProductionOrigin(origin));
+
+  if (onNetlifyProd && origin) {
+    list.push(origin);
+  }
+
+  if (PROXY_ENV && !(onNetlifyProd && isPrivateOrLocalProxyBase(PROXY_ENV))) {
+    list.push(PROXY_ENV);
+  }
 
   const fromBundler = devProxyFromBundlerHost();
   if (fromBundler) list.push(fromBundler);
 
   if (Platform.OS === 'web') {
     if (__DEV__) list.push(`http://localhost:${PROXY_PORT}`);
-    const origin = netlifyOrigin();
-    if (origin && /netlify\.app|\.netlify\.live/i.test(origin)) {
+    if (origin && isNetlifyProductionOrigin(origin) && !list.includes(origin)) {
       list.push(origin);
     }
   }
@@ -137,9 +159,12 @@ async function postJson<T>(url: string, body: object): Promise<T> {
   return data;
 }
 
-const PROXY_HELP =
-  'Start the local AI proxy on your PC: npm run proxy:ai (port 8787). '
-  + 'Phone and PC must be on the same Wi‑Fi. On Netlify production, set OPENAI_API_KEY in site env (uses /.netlify/functions/openai-proxy — not Supabase).';
+function productionProxyHelp(origin: string | null): string {
+  if (origin && isNetlifyProductionOrigin(origin)) {
+    return 'Netlify: Site configuration → Environment variables → add OPENAI_API_KEY (same as local .env), then Deploys → Trigger deploy. Uses /.netlify/functions/openai-proxy.';
+  }
+  return 'Local dev: run npm run proxy:ai on your PC (port 8787), same Wi‑Fi as phone.';
+}
 
 /**
  * Calls OpenAI chat completions via local/Netlify proxy (key never in the browser bundle).
@@ -173,9 +198,13 @@ export async function invokeOpenAiChat(
     }
   }
 
-  const tried = bases.length ? bases.join(', ') : 'none';
+  const origin = netlifyOrigin();
+  const last = errors[errors.length - 1] ?? '';
+  const detail = last.includes(': ') ? last.split(': ').slice(1).join(': ') : last;
   throw new OpenAiProxyError(
-    `${PROXY_HELP}${__DEV__ ? ` Tried: ${tried}. ${errors.join(' | ')}` : ''}`,
+    detail
+      ? `${detail} — ${productionProxyHelp(origin)}`
+      : productionProxyHelp(origin),
   );
 }
 

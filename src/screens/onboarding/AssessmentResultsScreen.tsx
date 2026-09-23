@@ -105,9 +105,11 @@ export default function AssessmentResultsScreen() {
           <Text style={[styles.loadingTitle, { color: theme.textPrimary }]}>AI plan not generated</Text>
           <Text style={[styles.errorText, { color: '#FF5959' }]}>{error}</Text>
           <Text style={[styles.loadingSub, { color: theme.textSecondary }]}>
-            {answered} answers saved on this device. On your PC run npm run proxy:ai (port 8787), keep Expo running, same Wi‑Fi as your phone, then tap Try again.
+            {answered} answers saved on this device — tap Try again after fixing the issue above.
             {'\n\n'}
-            Optional .env: EXPO_PUBLIC_ASSESSMENT_PROXY_URL=http://YOUR_PC_IP:8787 — in dev we also try the same IP as Metro (e.g. :8084 → :8787).
+            On Netlify: add OPENAI_API_KEY under Site configuration → Environment variables, redeploy, then Try again.
+            {'\n\n'}
+            Local Expo: npm run proxy:ai on your PC, same Wi‑Fi as your phone.
           </Text>
         </View>
       </StickyFooterLayout>
