@@ -452,7 +452,8 @@ export default function HomeScreen() {
   const calorieGoal = (profile as any)?.daily_calorie_goal ?? 2000;
   const waterGoalMl = (profile as any)?.water_goal_ml ?? 2500;
   const streakCount = (profile as any)?.streak_count ?? 0;
-  const firstName   = profile?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'there';
+  const displayName = profile?.full_name?.trim() || profile?.calfit_id || user?.email?.split('@')[0] || 'there';
+  const handle = profile?.calfit_id?.trim();
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -501,7 +502,10 @@ export default function HomeScreen() {
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <View>
           <Text style={[styles.greeting, { color: theme.textSecondary }]}>{greeting} 👋</Text>
-          <Text style={[styles.name, { color: theme.textPrimary }]}>{firstName}</Text>
+          <Text style={[styles.name, { color: theme.textPrimary }]}>{displayName}</Text>
+          {handle ? (
+            <Text style={[styles.handle, { color: theme.textMuted }]}>@{handle}</Text>
+          ) : null}
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
@@ -572,6 +576,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 0.5 },
   greeting: { fontSize: fontSize.sm, fontWeight: '500' },
   name: { fontSize: fontSize.xxl + 2, fontWeight: '800', marginTop: 1 },
+  handle: { fontSize: fontSize.sm, fontWeight: '600', marginTop: 2 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headerIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, position: 'relative' },
   badge: { position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },

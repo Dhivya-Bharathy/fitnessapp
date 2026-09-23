@@ -250,51 +250,62 @@ export default function OnboardingScreen() {
     setIsLoading(true);
     try {
       setOnboarding(true);
-      const { data: anonData, error } = await supabase.auth.signInAnonymously();
-      if (error?.message?.includes('anonymous_provider_disabled') || (error as { code?: string })?.code === 'anonymous_provider_disabled') {
-        Alert.alert(
-          'Enable demo sign-in',
-          'In Supabase Dashboard → Authentication → Providers → Anonymous sign-ins → Enable. Then tap Create My Account again.',
-        );
-        setOnboarding(false);
-        setIsLoading(false);
-        return;
-      }
-      if (error || !anonData?.session) {
-        Alert.alert('Error', error?.message ?? 'Could not create account.');
-        setOnboarding(false);
-        setIsLoading(false);
-        return;
-      }
-      useAuthStore.setState({
-        session: anonData.session,
-        user: anonData.session.user,
-        isAuthenticated: true,
-        isOnboarding: true,
-      });
-      if (anonData.user) {
-        const { saveOnboardingProfile } = await import('../../services/profileService');
-        const saved = await saveOnboardingProfile(anonData.user.id, {
-          full_name: name,
-          calfit_id: username,
-          goal,
-          height_cm: parseFloat(height) || null,
-          current_weight_kg: parseFloat(weight) || null,
-          tracking_preferences: trackingPrefs,
-        });
-        if (!saved.ok) {
-          Alert.alert('Profile not saved', saved.message);
+      let userId = useAuthStore.getState().user?.id;
+      let session = useAuthStore.getState().session;
+
+      if (!userId) {
+        const { data: anonData, error } = await supabase.auth.signInAnonymously();
+        if (error?.message?.includes('anonymous_provider_disabled') || (error as { code?: string })?.code === 'anonymous_provider_disabled') {
+          Alert.alert(
+            'Enable demo sign-in',
+            'In Supabase Dashboard → Authentication → Providers → Anonymous sign-ins → Enable. Then tap Create My Account again.',
+          );
           setOnboarding(false);
           setIsLoading(false);
           return;
         }
-        useAuthStore.getState().updateProfile(saved.profile as any);
-        await useAuthStore.getState().loadProfile(anonData.user.id);
-        const { sendWelcomeNotification } = await import('../../services/notificationService');
-        await sendWelcomeNotification(anonData.user.id, 'there');
+        if (error || !anonData?.session?.user) {
+          Alert.alert('Error', error?.message ?? 'Could not create account.');
+          setOnboarding(false);
+          setIsLoading(false);
+          return;
+        }
+        session = anonData.session;
+        userId = anonData.session.user.id;
+        useAuthStore.setState({
+          session: anonData.session,
+          user: anonData.session.user,
+          isAuthenticated: true,
+          isOnboarding: true,
+        });
       }
+
+      const { saveOnboardingProfile, getProfile } = await import('../../services/profileService');
+      const saved = await saveOnboardingProfile(userId!, {
+        full_name: name,
+        calfit_id: username,
+        goal,
+        height_cm: parseFloat(height) || null,
+        current_weight_kg: parseFloat(weight) || null,
+        tracking_preferences: trackingPrefs,
+      });
+      if (!saved.ok) {
+        Alert.alert('Profile not saved', saved.message);
+        setOnboarding(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const full = await getProfile(userId!);
+      useAuthStore.getState().updateProfile(full ?? (saved.profile as any));
+
+      if (session?.user) {
+        const { sendWelcomeNotification } = await import('../../services/notificationService');
+        await sendWelcomeNotification(session.user.id, name || 'there');
+      }
+
       setIsLoading(false);
-      navigation.navigate('FitnessAssessment');
+      navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
     } catch {
       setOnboarding(false);
       Alert.alert('Error', 'Something went wrong.');

@@ -80,14 +80,39 @@ export async function saveOnboardingProfile(
   return { ok: true, profile: row };
 }
 
-/** Deletes profile row (cascades). Requires DELETE RLS policy on profiles. */
-export async function deleteAccountData(userId: string): Promise<{ ok: boolean; message?: string }> {
-  const { error } = await supabase.from('profiles').delete().eq('id', userId);
+/** Wipes profile fields so user must redo onboarding + 22 questions (works without DELETE policy). */
+export async function wipeProfileOnServer(userId: string): Promise<{ ok: boolean; message?: string }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: null,
+      calfit_id: null,
+      goal: null,
+      bio: null,
+      height_cm: null,
+      current_weight_kg: null,
+      tracking_preferences: [],
+      equipment_preferences: [],
+      streak_count: 0,
+      last_active_date: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
   if (error) {
-    if (__DEV__) console.error('[deleteAccountData]', error.message);
+    if (__DEV__) console.error('[wipeProfileOnServer]', error.message);
     return { ok: false, message: error.message };
   }
   return { ok: true };
+}
+
+/** Deletes profile row (cascades), or wipes fields if DELETE is blocked by RLS. */
+export async function deleteAccountData(userId: string): Promise<{ ok: boolean; message?: string }> {
+  const { error } = await supabase.from('profiles').delete().eq('id', userId);
+  if (!error) return { ok: true };
+
+  if (__DEV__) console.warn('[deleteAccountData] delete failed, wiping profile:', error.message);
+  return wipeProfileOnServer(userId);
 }
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {

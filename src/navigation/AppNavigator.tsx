@@ -2,7 +2,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, Platform, StatusBar, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { RadialMenu } from '../components/RadialMenu';
 import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
@@ -52,7 +52,7 @@ import MealPlanScreen from '../screens/meals/MealPlanScreen';
 
 // ── AI FOOD SCANNER ───────────────────────────────────────────
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
-import { isFitnessAssessmentComplete } from '../utils/onboardingFlags';
+import { isFitnessAssessmentComplete, getLocalAssessmentComplete } from '../utils/onboardingFlags';
 
 // ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
@@ -245,16 +245,47 @@ function TabNavigator() {
 function AuthStack() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
+  const authEpoch = useAuthStore((s) => s.authEpoch);
+  const [assessmentDoneLocal, setAssessmentDoneLocal] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!user?.id) {
+        if (active) setAssessmentDoneLocal(false);
+        return;
+      }
+      const done = await getLocalAssessmentComplete(user.id);
+      if (active) setAssessmentDoneLocal(done);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user?.id, authEpoch]);
+
+  useEffect(() => {
+    if (!user?.id || !profile?.goal) return;
+    const done = isFitnessAssessmentComplete(profile) || assessmentDoneLocal;
+    if (done) {
+      useAuthStore.getState().setOnboarding(false);
+    }
+  }, [user?.id, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal]);
 
   const initialRoute = useMemo(() => {
     if (!user) return 'Welcome';
-    if (profile?.goal && !isFitnessAssessmentComplete(profile)) return 'FitnessAssessment';
     if (!profile?.goal) return 'Onboarding';
-    return 'Welcome';
-  }, [user, profile?.goal, profile?.tracking_preferences]);
+    const assessmentDone =
+      isFitnessAssessmentComplete(profile) || assessmentDoneLocal;
+    if (!assessmentDone) return 'FitnessAssessment';
+    return 'Onboarding';
+  }, [user, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal]);
 
   return (
-    <RootStack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+    <RootStack.Navigator
+      key={`auth-stack-${authEpoch}-${user?.id ?? 'guest'}`}
+      initialRouteName={initialRoute}
+      screenOptions={{ headerShown: false }}
+    >
       <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
       <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
       <RootStack.Screen name="FitnessAssessment" component={FitnessAssessmentScreen} />
@@ -281,9 +312,9 @@ export default function AppNavigator() {
   const { user, isOnboarding, authReady } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
+  const authEpoch = useAuthStore((s) => s.authEpoch);
   const showAuth = !user || isOnboarding;
-  // Stable key per user — avoid remounting the whole app when isOnboarding toggles.
-  const navKey = user?.id ?? 'guest';
+  const navKey = `nav-${authEpoch}-${user?.id ?? 'guest'}`;
 
   if (!authReady) {
     return (
