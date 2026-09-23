@@ -1,7 +1,8 @@
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Switch, Alert,
+  TouchableOpacity, Switch, Alert, Platform,
 } from 'react-native';
+import { confirmDialog } from '../../utils/confirmDialog';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -118,16 +119,14 @@ function SettingsGroup({ theme, title, items }: {
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme, toggleTheme } = useThemeStore();
-  const { user, profile, signOut, updateProfile } = useAuthStore();
+  const { user, profile, signOut, deleteAccount, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
 
   const [darkMode, setDarkMode]       = useState(colorScheme === 'dark');
   const [prefs, setPrefs]             = useState<NotifPrefs>(DEFAULT_PREFS);
 
-  const name     = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const username = (profile as any)?.calfit_id
-    || profile?.full_name?.toLowerCase().replace(/\s+/g, '')
-    || user?.email?.split('@')[0] || 'user';
+  const name = profile?.full_name?.trim() || user?.email?.split('@')[0] || 'User';
+  const username = profile?.calfit_id?.trim() || '';
 
   // ── LOAD PREFS ON EVERY FOCUS — fixes the toggle reset bug ──
   useFocusEffect(useCallback(() => {
@@ -205,43 +204,46 @@ export default function SettingsScreen() {
   const handleSleepReminder = async (val: boolean) =>
     updatePref('sleepReminders', val, () => scheduleSleepReminder(val));
 
-  const handleSignOut = () => {
-    Alert.alert(
+  const handleSignOut = async () => {
+    const ok = await confirmDialog(
       'Sign Out',
-      'This will clear your session. Your data stays on this device — just restart the app to pick up where you left off.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut },
-      ]
+      'You will return to the welcome screen. Your Supabase profile stays saved until you delete the account.',
+      'Sign Out',
     );
+    if (ok) await signOut();
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert('Delete Account', 'This permanently deletes all your data from this device. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Export Data First',
-        onPress: () => navigation.navigate('Main', { screen: 'DownloadData' }),
-      },
-      {
-        text: 'Delete Everything',
-        style: 'destructive',
-        onPress: () => {
-          Alert.alert(
-            'Are you sure?',
-            'All your progress, meals, workouts and settings will be permanently removed.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete Forever',
-                style: 'destructive',
-                onPress: signOut,
-              },
-            ]
-          );
-        },
-      },
-    ]);
+  const handleDeleteAccount = async () => {
+    const ok = await confirmDialog(
+      'Delete account',
+      'This permanently deletes your profile, logs, and progress from the server and clears the 22-question assessment on this device. You will start from scratch. This cannot be undone.',
+      'Continue',
+    );
+    if (!ok) return;
+
+    const sure = await confirmDialog(
+      'Delete forever?',
+      'All your data will be removed and you will go back to Welcome → onboarding → 22 questions.',
+      'Delete everything',
+    );
+    if (!sure) return;
+
+    const result = await deleteAccount();
+    if (!result.ok) {
+      const msg = result.message ?? 'Could not delete account.';
+      if (Platform.OS === 'web') {
+        window.alert(msg + '\n\nIf delete is blocked, run 001_profiles_delete_policy.sql in Supabase SQL Editor.');
+      } else {
+        Alert.alert('Delete failed', msg);
+      }
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      window.alert('Account deleted. Starting fresh.');
+    } else {
+      Alert.alert('Account deleted', 'You can create a new profile from Welcome.');
+    }
   };
 
   return (
@@ -264,7 +266,9 @@ export default function SettingsScreen() {
           <Avatar size={56} borderWidth={2} />
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
-            <Text style={[styles.profileHandle, { color: theme.textMuted }]}>@{username}</Text>
+            <Text style={[styles.profileHandle, { color: theme.textMuted }]}>
+              {username ? `@${username}` : 'Set username in Edit Profile'}
+            </Text>
              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Ionicons name="settings-outline" size={12} color={theme.accent} />
               <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '600' }}>Edit Profile</Text>

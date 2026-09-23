@@ -80,6 +80,16 @@ export async function saveOnboardingProfile(
   return { ok: true, profile: row };
 }
 
+/** Deletes profile row (cascades). Requires DELETE RLS policy on profiles. */
+export async function deleteAccountData(userId: string): Promise<{ ok: boolean; message?: string }> {
+  const { error } = await supabase.from('profiles').delete().eq('id', userId);
+  if (error) {
+    if (__DEV__) console.error('[deleteAccountData]', error.message);
+    return { ok: false, message: error.message };
+  }
+  return { ok: true };
+}
+
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await supabase
     .from('profiles')
