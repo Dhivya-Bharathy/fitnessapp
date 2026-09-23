@@ -105,8 +105,9 @@ export default function AssessmentResultsScreen() {
           <Text style={[styles.loadingTitle, { color: theme.textPrimary }]}>AI plan not generated</Text>
           <Text style={[styles.errorText, { color: '#FF5959' }]}>{error}</Text>
           <Text style={[styles.loadingSub, { color: theme.textSecondary }]}>
-            {answered} answers saved on this device. On your PC: run npm run proxy:ai, keep Expo running, then tap Try again.
-            Phone must use the same Wi‑Fi and EXPO_PUBLIC_ASSESSMENT_PROXY_URL=http://YOUR_PC_IP:8787 in .env.
+            {answered} answers saved on this device. On your PC run npm run proxy:ai (port 8787), keep Expo running, same Wi‑Fi as your phone, then tap Try again.
+            {'\n\n'}
+            Optional .env: EXPO_PUBLIC_ASSESSMENT_PROXY_URL=http://YOUR_PC_IP:8787 — in dev we also try the same IP as Metro (e.g. :8084 → :8787).
           </Text>
         </View>
       </StickyFooterLayout>

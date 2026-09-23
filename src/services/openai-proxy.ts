@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 export const OPENAI_CHAT_MODEL =
   process.env.EXPO_PUBLIC_OPENAI_MODEL || 'gpt-4o-mini';
@@ -7,6 +8,7 @@ export const OPENAI_VISION_MODEL =
   process.env.EXPO_PUBLIC_OPENAI_VISION_MODEL || OPENAI_CHAT_MODEL;
 
 const PROXY_ENV = process.env.EXPO_PUBLIC_ASSESSMENT_PROXY_URL?.replace(/\/$/, '');
+const PROXY_PORT = process.env.EXPO_PUBLIC_ASSESSMENT_PROXY_PORT || '8787';
 
 export class OpenAiProxyError extends Error {
   constructor(message: string) {
@@ -41,13 +43,42 @@ function netlifyOrigin(): string | null {
   return null;
 }
 
+/** Same LAN IP as Metro / Expo web — phone can reach proxy without editing .env. */
+function devProxyFromBundlerHost(): string | null {
+  if (!__DEV__) return null;
+
+  let host: string | null = null;
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    host = window.location.hostname;
+  }
+
+  const hostUri =
+    Constants.expoConfig?.hostUri
+    ?? (Constants as { manifest2?: { extra?: { expoClient?: { hostUri?: string } } } }).manifest2?.extra?.expoClient?.hostUri
+    ?? (Constants as { manifest?: { debuggerHost?: string } }).manifest?.debuggerHost;
+
+  if (typeof hostUri === 'string' && hostUri.length > 0) {
+    host = hostUri.split(':')[0];
+  }
+
+  if (!host || host === 'localhost' || host === '127.0.0.1') {
+    return `http://localhost:${PROXY_PORT}`;
+  }
+
+  return `http://${host}:${PROXY_PORT}`;
+}
+
 /** Local proxy base URLs (no trailing slash). */
 export function openAiProxyBaseUrls(): string[] {
   const list: string[] = [];
   if (PROXY_ENV) list.push(PROXY_ENV);
 
+  const fromBundler = devProxyFromBundlerHost();
+  if (fromBundler) list.push(fromBundler);
+
   if (Platform.OS === 'web') {
-    if (__DEV__) list.push('http://localhost:8787');
+    if (__DEV__) list.push(`http://localhost:${PROXY_PORT}`);
     const origin = netlifyOrigin();
     if (origin && /netlify\.app|\.netlify\.live/i.test(origin)) {
       list.push(origin);
@@ -80,11 +111,21 @@ function legacyAssessmentUrl(base: string): string {
 }
 
 async function postJson<T>(url: string, body: object): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new OpenAiProxyError(
+      msg.includes('Network') || msg.includes('Failed to fetch')
+        ? `Cannot reach ${url} — is npm run proxy:ai running on your PC?`
+        : msg,
+    );
+  }
   const data = (await res.json()) as T & { error?: string | { message?: string } };
   if (!res.ok) {
     const err =
@@ -97,8 +138,8 @@ async function postJson<T>(url: string, body: object): Promise<T> {
 }
 
 const PROXY_HELP =
-  'Start the local AI proxy: npm run proxy:ai — set EXPO_PUBLIC_ASSESSMENT_PROXY_URL=http://YOUR_PC_IP:8787 on phone. '
-  + 'On Netlify, set OPENAI_API_KEY (no Supabase edge functions).';
+  'Start the local AI proxy on your PC: npm run proxy:ai (port 8787). '
+  + 'Phone and PC must be on the same Wi‑Fi. On Netlify production, set OPENAI_API_KEY in site env (uses /.netlify/functions/openai-proxy — not Supabase).';
 
 /**
  * Calls OpenAI chat completions via local/Netlify proxy (key never in the browser bundle).
@@ -132,7 +173,10 @@ export async function invokeOpenAiChat(
     }
   }
 
-  throw new OpenAiProxyError(`${PROXY_HELP}${__DEV__ ? ` ${errors.join(' | ')}` : ''}`);
+  const tried = bases.length ? bases.join(', ') : 'none';
+  throw new OpenAiProxyError(
+    `${PROXY_HELP}${__DEV__ ? ` Tried: ${tried}. ${errors.join(' | ')}` : ''}`,
+  );
 }
 
 export async function invokeOpenAiChatContent(
