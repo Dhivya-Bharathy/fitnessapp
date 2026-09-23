@@ -1,10 +1,10 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Alert, ActivityIndicator, TextInput,
+  Alert, ActivityIndicator, TextInput, Platform,
 } from 'react-native';
 import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
 import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,8 +13,17 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { useIsCompactPhone, useLayoutWidth } from '../../hooks/useLayoutWidth';
+import { isFitnessAssessmentComplete } from '../../utils/onboardingFlags';
 
 const ACCENT = '#2DDC8C';
+
+function showUserMessage(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
 
 // ── HELPERS ────────────────────────────────────────────────────
 function StepWrap({ children }: { children: React.ReactNode }) {
@@ -55,7 +64,9 @@ function StepWelcome({
         <Text style={{ color: ACCENT }}>22 questions</Text> → AI training +{' '}
         <Text style={{ color: ACCENT }}>Indian diet</Text>
       </Text>
-      <Text style={styles.welcomeHint}>Tap to choose what you want to track (pick one or more)</Text>
+      <Text style={styles.welcomeHint}>
+        Step 1 of setup — pick what to track. The 22-question AI intake starts right after you save your profile.
+      </Text>
       <View style={styles.featureGrid}>
         {WELCOME_FEATURES.map((c) => {
           const active = selected.includes(c.id);
@@ -216,6 +227,18 @@ export default function OnboardingScreen() {
   const [username, setUsername] = useState('');
   const [trackingPrefs, setTrackingPrefs] = useState<string[]>(['calories']);
   const [isLoading, setIsLoading] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const { user, profile, forceAssessmentRetake } = useAuthStore.getState();
+    if (
+      user?.id
+      && profile?.goal
+      && (forceAssessmentRetake || !isFitnessAssessmentComplete(profile))
+    ) {
+      navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
+    }
+  }, [navigation]);
 
   const toggleTrackingPref = (id: string) => {
     setTrackingPrefs((prev) =>
@@ -240,13 +263,14 @@ export default function OnboardingScreen() {
 
   const handleSignUp = async () => {
     if (!name.trim()) {
-      Alert.alert('Display name', 'Please enter your display name.');
+      showUserMessage('Display name', 'Please enter your display name.');
       return;
     }
     if (username.trim().length < 3) {
-      Alert.alert('Username', 'Pick a username with at least 3 characters (a–z, 0–9, underscore).');
+      showUserMessage('Username', 'Pick a username with at least 3 characters (a–z, 0–9, underscore).');
       return;
     }
+    setProfileSaveError(null);
     setIsLoading(true);
     try {
       setOnboarding(true);
@@ -272,12 +296,6 @@ export default function OnboardingScreen() {
         }
         session = anonData.session;
         userId = anonData.session.user.id;
-        useAuthStore.setState({
-          session: anonData.session,
-          user: anonData.session.user,
-          isAuthenticated: true,
-          isOnboarding: true,
-        });
       }
 
       const { saveOnboardingProfile, getProfile } = await import('../../services/profileService');
@@ -290,18 +308,28 @@ export default function OnboardingScreen() {
         tracking_preferences: trackingPrefs,
       });
       if (!saved.ok) {
-        Alert.alert('Profile not saved', saved.message);
+        setProfileSaveError(saved.message);
+        showUserMessage('Profile not saved', saved.message);
         setOnboarding(false);
         setIsLoading(false);
         return;
       }
 
       const full = await getProfile(userId!);
-      useAuthStore.getState().updateProfile(full ?? (saved.profile as any));
+      const profileRow = full ?? (saved.profile as any);
 
       if (session?.user) {
+        useAuthStore.setState({
+          session,
+          user: session.user,
+          isAuthenticated: true,
+          isOnboarding: true,
+          profile: profileRow,
+        });
         const { sendWelcomeNotification } = await import('../../services/notificationService');
         await sendWelcomeNotification(session.user.id, name || 'there');
+      } else {
+        useAuthStore.getState().updateProfile(profileRow);
       }
 
       useAuthStore.getState().setOnboarding(true);
@@ -332,7 +360,16 @@ export default function OnboardingScreen() {
       case 'welcome':  return <StepWelcome selected={trackingPrefs} onToggle={toggleTrackingPref} layoutWidth={layoutWidth} compact={compact} />;
       case 'goal':     return <StepGoal theme={theme} selected={goal} onSelect={setGoal} />;
       case 'stats':    return <StepStats theme={theme} height={height} setHeight={setHeight} weight={weight} setWeight={setWeight} />;
-      case 'account':  return <StepAccount theme={theme} name={name} setName={setName} username={username} setUsername={setUsername} isLoading={isLoading} onSignUp={handleSignUp} />;
+      case 'account':  return (
+        <>
+          {profileSaveError ? (
+            <View style={[styles.saveErrorBanner, { borderColor: '#F87171', backgroundColor: 'rgba(248,113,113,0.12)' }]}>
+              <Text style={styles.saveErrorText}>{profileSaveError}</Text>
+            </View>
+          ) : null}
+          <StepAccount theme={theme} name={name} setName={setName} username={username} setUsername={setUsername} isLoading={isLoading} onSignUp={handleSignUp} />
+        </>
+      );
       case 'generating': return <StepGenerating theme={theme} />;
       default: return null;
     }
@@ -441,4 +478,12 @@ const styles = StyleSheet.create({
 
   signInRow: { alignItems: 'center', marginTop: spacing.md },
   signInText: { fontSize: fontSize.sm },
+  saveErrorBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  saveErrorText: { color: '#FCA5A5', fontSize: fontSize.sm, lineHeight: 20 },
 });

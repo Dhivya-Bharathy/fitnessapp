@@ -295,7 +295,7 @@ function AuthStack() {
 
   return (
     <RootStack.Navigator
-      key={`auth-stack-${authEpoch}-${user?.id ?? 'guest'}`}
+      key={`auth-stack-${authEpoch}`}
       initialRouteName={initialRoute}
       screenOptions={{ headerShown: false }}
     >
@@ -328,7 +328,7 @@ export default function AppNavigator() {
   const theme = colors[colorScheme];
   const authEpoch = useAuthStore((s) => s.authEpoch);
   const showAuth = shouldShowOnboardingFlow(user, profile, { forceAssessmentRetake });
-  const navKey = `nav-${authEpoch}-${user?.id ?? 'guest'}`;
+  const navKey = `nav-${authEpoch}`;
 
   if (!authReady) {
     return (

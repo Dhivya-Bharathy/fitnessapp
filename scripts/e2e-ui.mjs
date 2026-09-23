@@ -104,7 +104,9 @@ async function runFlow(page, label) {
   await clickByText(page, 'Continue', { exact: false });
 
   step('Account');
-  await clickByText(page, 'Save & Continue →', { exact: true });
+  await page.getByPlaceholder('e.g. John Doe').fill('E2E User');
+  await page.getByPlaceholder('e.g. johndoe').fill(`e2e_${Date.now().toString(36).slice(-6)}`);
+  await clickByText(page, 'Create My Account', { exact: false });
   await page.waitForTimeout(3000);
 
   step('Assessment');

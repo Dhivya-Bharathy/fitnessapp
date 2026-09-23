@@ -1,6 +1,41 @@
 import { supabase } from './supabase';
 import { stripAssessmentDoneFromPrefs } from '../utils/onboardingFlags';
 
+function missingColumnFromError(message: string | undefined): string | null {
+  if (!message) return null;
+  const quoted = message.match(/'([^']+)'\s+column/i);
+  if (quoted?.[1]) return quoted[1];
+  const doesNotExist = message.match(/column profiles\.([a-z0-9_]+) does not exist/i);
+  if (doesNotExist?.[1]) return doesNotExist[1];
+  return null;
+}
+
+async function upsertProfileRow(
+  row: Record<string, unknown>,
+): Promise<{ ok: true; row: Record<string, unknown> } | { ok: false; message: string }> {
+  const payload = { ...row };
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
+    if (!error) return { ok: true, row: payload };
+
+    if (error.code === '23505' && error.message?.includes('calfit_id') && 'calfit_id' in payload) {
+      const base = String(payload.calfit_id ?? 'user');
+      payload.calfit_id = `${base}_${Math.random().toString(36).slice(2, 6)}`.slice(0, 32);
+      continue;
+    }
+
+    const missing = missingColumnFromError(error.message);
+    if (missing && missing in payload) {
+      delete payload[missing];
+      continue;
+    }
+
+    if (__DEV__) console.error('[upsertProfileRow]', error.message);
+    return { ok: false, message: error.message || 'Could not save profile.' };
+  }
+  return { ok: false, message: 'Could not save profile after retries.' };
+}
+
 /** Represents a user's profile data including goals, body metrics, preferences, and daily targets. */
 export interface Profile {
   id: string;
@@ -52,7 +87,7 @@ export async function saveOnboardingProfile(
     return { ok: false, message: 'Username must be at least 3 characters (letters, numbers, underscore).' };
   }
 
-  const row = {
+  const row: Record<string, unknown> = {
     id: userId,
     full_name: fields.full_name.trim() || null,
     calfit_id,
@@ -60,25 +95,29 @@ export async function saveOnboardingProfile(
     height_cm: fields.height_cm,
     current_weight_kg: fields.current_weight_kg,
     tracking_preferences: stripAssessmentDoneFromPrefs(fields.tracking_preferences),
+    bio: JSON.stringify({
+      onboarding_v1: {
+        display_name: fields.full_name.trim(),
+        username: calfit_id,
+        height_cm: fields.height_cm,
+        weight_kg: fields.current_weight_kg,
+        tracking: fields.tracking_preferences,
+      },
+    }),
   };
 
-  let { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
-
-  if (error?.code === '23505' && error.message?.includes('calfit_id')) {
-    const suffix = Math.random().toString(36).slice(2, 6);
-    const alt = `${calfit_id}_${suffix}`.slice(0, 32);
-    ({ error } = await supabase.from('profiles').upsert({ ...row, calfit_id: alt }, { onConflict: 'id' }));
-    if (!error) {
-      return { ok: true, profile: { ...row, calfit_id: alt } };
-    }
+  const upserted = await upsertProfileRow(row);
+  if (!upserted.ok) {
+    return {
+      ok: false,
+      message: `${upserted.message} Apply supabase/migrations/000_full_schema.sql (or 002_profiles_calfit_id.sql) in Supabase → SQL.`,
+    };
   }
 
-  if (error) {
-    if (__DEV__) console.error('[saveOnboardingProfile]', error.message);
-    return { ok: false, message: error.message || 'Could not save profile.' };
-  }
-
-  return { ok: true, profile: row };
+  return {
+    ok: true,
+    profile: { ...upserted.row, calfit_id } as Partial<Profile>,
+  };
 }
 
 /** Wipes profile fields so user must redo onboarding + 22 questions (works without DELETE policy). */
@@ -119,7 +158,7 @@ export async function deleteAccountData(userId: string): Promise<{ ok: boolean; 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, calfit_id, full_name, goal, activity_level, age, height_cm, current_weight_kg, target_weight_kg, daily_calorie_goal, protein_goal_g, carb_goal_g, fat_goal_g, water_goal_ml, sleep_goal_hrs, step_goal, theme, units, dietary_preference, tracking_preferences, streak_count, last_active_date, created_at, updated_at, avatar_url')
+    .select('*')
     .eq('id', userId)
     .maybeSingle();
 
@@ -127,7 +166,8 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
     if (__DEV__) console.error('Error fetching profile:', error.message);
     return null;
   }
-  return data;
+  if (!data) return null;
+  return data as Profile;
 };
 
 /**
