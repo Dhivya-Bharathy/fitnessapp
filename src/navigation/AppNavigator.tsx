@@ -85,9 +85,26 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
   const theme = colors[colorScheme];
   const [radialOpen, setRadialOpen] = useState(false);
 
-  // Hide tab bar on PartnerChat screen
   const currentRoute = state.routeNames[state.index];
   if (currentRoute === 'PartnerChat') return null;
+
+  const premiumHomeTab =
+    currentRoute === 'Home'
+    || currentRoute === 'Streaks'
+    || currentRoute === 'Accountability'
+    || currentRoute === 'Calorie'
+    || currentRoute === 'MealPlan'
+    || currentRoute === 'Notifications'
+    || currentRoute === 'AICoach'
+    || currentRoute === 'Notes'
+    || currentRoute === 'Sleep'
+    || currentRoute === 'QuickStart'
+    || currentRoute === 'Activity'
+    || currentRoute === 'Progress';
+  const tabBarBg = premiumHomeTab ? 'rgba(5, 6, 8, 0.94)' : theme.tabBar;
+  const tabBorder = premiumHomeTab ? 'rgba(255,255,255,0.08)' : theme.border;
+  const tabActive = premiumHomeTab ? '#34D98A' : theme.tabBarActive;
+  const tabInactive = premiumHomeTab ? 'rgba(255,255,255,0.45)' : theme.tabBarInactive;
 
   const handleRadialSelect = (key: string) => {
     setRadialOpen(false);
@@ -113,7 +130,7 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
         theme={theme}
       />
 
-      <View style={[tb.bar, { backgroundColor: theme.tabBar, borderTopColor: theme.border }]}>
+      <View style={[tb.bar, { backgroundColor: tabBarBg, borderTopColor: tabBorder }]}>
         {visibleRoutes.map((route, index) => {
           const isFocused = state.index === index;
           const icon = TAB_ICONS[route.name];
@@ -129,9 +146,9 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
               <Ionicons
                 name={isFocused ? icon.active : icon.inactive}
                 size={22}
-                color={isFocused ? theme.tabBarActive : theme.tabBarInactive}
+                color={isFocused ? tabActive : tabInactive}
               />
-              <Text style={[tb.label, { color: isFocused ? theme.tabBarActive : theme.tabBarInactive }]}>
+              <Text style={[tb.label, { color: isFocused ? tabActive : tabInactive }]}>
                 {label}
               </Text>
             </TouchableOpacity>
@@ -142,7 +159,7 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
         <TouchableOpacity
           onPress={() => setRadialOpen(true)}
           activeOpacity={0.85}
-          style={[tb.plusBtn, { backgroundColor: theme.accent }]}
+          style={[tb.plusBtn, { backgroundColor: premiumHomeTab ? '#2DDC8C' : theme.accent }]}
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>

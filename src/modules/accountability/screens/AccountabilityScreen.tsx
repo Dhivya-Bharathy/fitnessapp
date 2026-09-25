@@ -1,29 +1,44 @@
 import {
-  View, Text, StyleSheet, ScrollView, Modal, TextInput,
-  TouchableOpacity, Alert, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform,
+  View, Text, StyleSheet, Modal, TextInput,
+  TouchableOpacity, Alert, ActivityIndicator, RefreshControl, KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../shared/AndroidSafeView';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeStore } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../../theme';
 import { PartnerCard } from '../components/PartnerCard';
 import { PartnerInviteSheet } from '../components/PartnerInviteSheet';
-import { EmptyState } from '../../shared/EmptyState';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { usePartner } from '../hooks/usePartner';
-import { PastelScreenBackground, isWellnessLight } from '../../../components/wellness';
 import { ScreenScrollView } from '../../../components/ScreenScrollView';
-// ── SAFE COLORS ───────────────────────────────────────────────
-const BLUE   = '#6699FF';
+import { PremiumAtmosphereBackground } from '../../../components/premium/PremiumAtmosphereBackground';
+import {
+  PREMIUM_BG as BG,
+  PREMIUM_GLASS as GLASS,
+  PREMIUM_GLASS_BORDER as GLASS_BORDER,
+  PREMIUM_TEXT as TEXT,
+  PREMIUM_MUTED as MUTED,
+  PREMIUM_ACCENT as ACCENT,
+  premiumGlassShadow,
+} from '../../../components/premium/premiumEffects';
+import { AccountabilityFeatureArt, EmptyPartnersArt } from '../../../components/premium/AccountabilityFeatureArt';
+
 const PURPLE = '#B280FF';
 const ORANGE = '#FFB347';
-const GREEN  = '#2DDC8C';
-const PINK   = '#FF6B9D';
-const GOLD   = '#FFD133';
+const GREEN = '#2DDC8C';
+
+const premiumTheme: typeof colors.dark = {
+  ...colors.dark,
+  bg: BG,
+  card: GLASS,
+  border: GLASS_BORDER,
+  surface: GLASS,
+};
+
+const glassShadow = premiumGlassShadow();
 
 const MAX_PARTNERS = 3;
 
@@ -232,10 +247,8 @@ const sg = StyleSheet.create({
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function AccountabilityScreen() {
   const navigation = useNavigation<any>();
-  const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
-  const theme = colors[colorScheme];
-  const wellness = isWellnessLight(colorScheme);
+  const theme = premiumTheme;
 
   const [showInvite, setShowInvite]     = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -309,17 +322,12 @@ export default function AccountabilityScreen() {
   }, [safePartners, user]);
 
   return (
-    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
-      {wellness && <PastelScreenBackground />}
+    <AndroidSafeView backgroundColor={BG} style={styles.safe}>
+      <PremiumAtmosphereBackground />
 
-      {/* ── GRADIENT HEADER ── */}
-      <LinearGradient
-        colors={[BLUE + 'EE', PURPLE + 'CC'] as [string, string]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#fff" />
+          <Ionicons name="chevron-back" size={22} color={TEXT} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Accountability</Text>
@@ -327,68 +335,85 @@ export default function AccountabilityScreen() {
         </View>
         {safePartners.length < MAX_PARTNERS && (
           <TouchableOpacity onPress={() => setShowInvite(true)} style={styles.addBtn}>
-            <Ionicons name="person-add-outline" size={16} color="#fff" />
-            <Text style={styles.addBtnText}>Add</Text>
+            <Ionicons name="person-add-outline" size={16} color="#E8D4FF" />
+            <Text style={styles.addBtnText}>+ Add</Text>
           </TouchableOpacity>
         )}
-      </LinearGradient>
-
-      {/* ── PARTNER LIMIT BAR ── */}
-      <View style={[styles.limitBar, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-        <Ionicons name="people-outline" size={13} color={theme.accent} />
-        <Text style={[styles.limitText, { color: theme.accent }]}>
-          {safePartners.length}/{MAX_PARTNERS} partners · Fitness progress only is shared
-        </Text>
       </View>
 
       {isLoading ? (
         <View style={styles.loading}>
-          <ActivityIndicator color={theme.accent} size="large" />
+          <ActivityIndicator color={ACCENT} size="large" />
         </View>
       ) : (
         <ScreenScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={BLUE} colors={[BLUE]} />
+            <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={ACCENT} colors={[ACCENT]} />
           }
         >
-          {safePartners.length === 0 ? (
-            <>
-              {/* Empty state with feature preview */}
-              <View style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg, marginTop: spacing.lg }]}>
-                <LinearGradient
-                  colors={[BLUE + '30', PURPLE + '20'] as [string, string]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.featureGrad}
-                >
-                  <Text style={styles.featureTitle}>Stay Consistent Together</Text>
-                  <Text style={[styles.featureSub, { color: 'rgba(255,255,255,0.75)' }]}>
-                    Add up to 3 partners by Fitness ID. Share streaks, set goals, and stay accountable together.
-                  </Text>
-                  {[
-                    { icon: 'flame-outline',   text: 'Compare streaks side by side',   color: ORANGE },
-                    { icon: 'flag-outline',    text: 'Set and track shared goals',     color: GREEN  },
-                  ].map((f) => (
-                    <View key={f.text} style={styles.featureRow}>
-                      <View style={[styles.featureIcon, { backgroundColor: f.color + '22' }]}>
-                        <Ionicons name={f.icon as any} size={14} color={f.color} />
+          <View style={styles.featureOuter}>
+            <LinearGradient
+              colors={['rgba(45,220,140,0.22)', 'rgba(178,128,255,0.18)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.featureBorderGrad}
+            >
+              <View style={[styles.featureCard, glassShadow]}>
+                <View style={styles.featureBody}>
+                  <View style={styles.featureMain}>
+                    <TouchableOpacity style={styles.limitRow} activeOpacity={0.85}>
+                      <View style={styles.limitLeft}>
+                        <View style={[styles.limitIcon, { backgroundColor: ACCENT + '22' }]}>
+                          <Ionicons name="people" size={16} color={ACCENT} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.limitTitle}>
+                            {safePartners.length}/{MAX_PARTNERS} partners
+                          </Text>
+                          <Text style={styles.limitSub}>Fitness progress only is shared</Text>
+                        </View>
                       </View>
-                      <Text style={styles.featureRowText}>{f.text}</Text>
-                    </View>
-                  ))}
-                </LinearGradient>
+                      <Ionicons name="chevron-forward" size={18} color={MUTED} />
+                    </TouchableOpacity>
+                    {[
+                      { icon: 'flame-outline' as const, text: 'Compare streaks side by side', color: ORANGE },
+                      { icon: 'flag-outline' as const, text: 'Set and track shared goals', color: GREEN },
+                    ].map((f) => (
+                      <View key={f.text} style={styles.featureRow}>
+                        <View style={[styles.featureIcon, { backgroundColor: f.color + '22' }]}>
+                          <Ionicons name={f.icon} size={14} color={f.color} />
+                        </View>
+                        <Text style={styles.featureRowText}>{f.text}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <AccountabilityFeatureArt />
+                </View>
               </View>
+            </LinearGradient>
+          </View>
 
-              <EmptyState
-                theme={theme}
-                icon="people-outline"
-                title="No partners yet"
-                subtitle="Add a partner by their Fitness ID to start keeping each other accountable."
-                buttonLabel="Add a Partner"
-                onButtonPress={() => setShowInvite(true)}
-              />
-            </>
+          {safePartners.length === 0 ? (
+            <View style={styles.emptyBlock}>
+              <EmptyPartnersArt />
+              <Text style={styles.emptyTitle}>No partners yet</Text>
+              <Text style={styles.emptySub}>
+                Add a partner by their Fitness ID to start keeping each other accountable
+              </Text>
+              <TouchableOpacity onPress={() => setShowInvite(true)} activeOpacity={0.9}>
+                <LinearGradient
+                  colors={['#2DDC8C', '#28C07A']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.emptyCta}
+                >
+                  <Ionicons name="person-add" size={18} color="#fff" />
+                  <Text style={styles.emptyCtaText}>Add a Partner</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           ) : (
             <>
               {/* Shared dashboard with first partner */}
@@ -416,9 +441,7 @@ export default function AccountabilityScreen() {
 
               {/* Partner cards */}
               <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                  Your Partners
-                </Text>
+                <Text style={styles.sectionTitle}>Your Partners</Text>
               </View>
               {safePartners.map((partner) => (
                 <PartnerCard
@@ -439,10 +462,10 @@ export default function AccountabilityScreen() {
               {safePartners.length < MAX_PARTNERS && (
                 <TouchableOpacity
                   onPress={() => setShowInvite(true)}
-                  style={[styles.addMoreBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  style={[styles.addMoreBtn, glassShadow]}
                 >
-                  <Ionicons name="person-add-outline" size={18} color={theme.accent} />
-                  <Text style={[styles.addMoreText, { color: theme.accent }]}>
+                  <Ionicons name="person-add-outline" size={18} color={ACCENT} />
+                  <Text style={styles.addMoreText}>
                     Add another partner ({MAX_PARTNERS - safePartners.length} slot{MAX_PARTNERS - safePartners.length !== 1 ? 's' : ''} left)
                   </Text>
                 </TouchableOpacity>
@@ -450,27 +473,31 @@ export default function AccountabilityScreen() {
             </>
           )}
 
-          {/* How it works */}
-          <View style={[styles.howCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.howTitle, { color: theme.textPrimary }]}>How Accountability Works</Text>
+          <View style={[styles.howCard, glassShadow]}>
+            <Text style={styles.howTitle}>How Accountability Works</Text>
+            <View style={styles.howGrid}>
               {[
-                { icon: '🔍', text: 'Find partners by their @Fitness ID' },
-                { icon: '🔥', text: 'Only streaks & workout activity are shared' },
-                { icon: '🎯', text: 'Set shared goals to stay focused together' },
+                { icon: 'search-outline' as const, color: PURPLE, text: 'Find partners by their @Fitness ID' },
+                { icon: 'flame-outline' as const, color: ORANGE, text: 'Only streaks & workout activity are shared' },
+                { icon: 'locate-outline' as const, color: ACCENT, text: 'Set shared goals to stay focused together' },
               ].map((r) => (
-              <View key={r.text} style={styles.howRow}>
-                <Text style={{ fontSize: 16 }}>{r.icon}</Text>
-                <Text style={[styles.howText, { color: theme.textSecondary }]}>{r.text}</Text>
-              </View>
-            ))}
+                <View key={r.text} style={styles.howCol}>
+                  <View style={[styles.howIcon, { backgroundColor: r.color + '18', borderColor: r.color + '45' }]}>
+                    <Ionicons name={r.icon} size={20} color={r.color} />
+                  </View>
+                  <Text style={styles.howText}>{r.text}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
-          <View style={{ height: 80 }} />
+          <View style={{ height: 88 }} />
         </ScreenScrollView>
       )}
 
       <PartnerInviteSheet
         theme={theme}
+        premium
         visible={showInvite}
         isAdding={isAdding}
         currentUserId={user?.id ?? ''}
@@ -482,30 +509,113 @@ export default function AccountabilityScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1 },
-  scroll:   { paddingBottom: 40 },
-  loading:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
-  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
-  headerSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
-  addBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.18)' },
-  addBtnText: { color: '#fff', fontSize: fontSize.xs, fontWeight: '700' },
-  limitBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginHorizontal: spacing.lg, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1 },
-  limitText:{ fontSize: fontSize.xs, fontWeight: '600', flex: 1 },
-  featureCard: { borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
-  featureGrad: { padding: spacing.lg, gap: spacing.md },
-  featureTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
-  featureSub: { fontSize: fontSize.sm, lineHeight: 20 },
+  safe: { flex: 1 },
+  scroll: { paddingBottom: 40 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: TEXT },
+  headerSub: { fontSize: fontSize.xs, color: MUTED, marginTop: 2 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: 99,
+    backgroundColor: 'rgba(178,128,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(178,128,255,0.5)',
+  },
+  addBtnText: { color: '#D4B8FF', fontSize: fontSize.xs, fontWeight: '700' },
+  featureOuter: { marginHorizontal: spacing.lg, marginTop: spacing.sm },
+  featureBorderGrad: { borderRadius: radius.lg + 2, padding: 1 },
+  featureCard: {
+    borderRadius: radius.lg + 1,
+    backgroundColor: GLASS,
+    padding: spacing.lg,
+  },
+  featureBody: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  featureMain: { flex: 1, gap: spacing.md, minWidth: 0 },
+  limitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  limitLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
+  limitIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  limitTitle: { fontSize: fontSize.base, fontWeight: '800', color: TEXT },
+  limitSub: { fontSize: fontSize.xs, color: MUTED, marginTop: 2 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  featureIcon:{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  featureRowText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '500' },
+  featureIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  featureRowText: { color: 'rgba(255,255,255,0.85)', fontSize: fontSize.sm, fontWeight: '500', flex: 1 },
+  emptyBlock: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyTitle: { fontSize: fontSize.xl, fontWeight: '800', color: TEXT, textAlign: 'center' },
+  emptySub: { fontSize: fontSize.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md + 2,
+    borderRadius: radius.xl + 4,
+    marginTop: spacing.sm,
+    minWidth: 260,
+  },
+  emptyCtaText: { color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
   sectionHeader: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm, marginTop: spacing.sm },
-  sectionTitle: { fontSize: fontSize.base, fontWeight: '700' },
-  addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed' },
-  addMoreText:{ fontSize: fontSize.sm, fontWeight: '600' },
-  howCard:    { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
-  howTitle:   { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs },
-  howRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  howText:    { fontSize: fontSize.sm, lineHeight: 20, flex: 1 },
+  sectionTitle: { fontSize: fontSize.base, fontWeight: '700', color: TEXT },
+  addMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    borderStyle: 'dashed',
+    backgroundColor: GLASS,
+  },
+  addMoreText: { fontSize: fontSize.sm, fontWeight: '600', color: ACCENT },
+  howCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    backgroundColor: GLASS,
+    padding: spacing.lg,
+  },
+  howTitle: { fontSize: fontSize.base, fontWeight: '700', color: TEXT, marginBottom: spacing.md },
+  howGrid: { flexDirection: 'row', gap: spacing.sm },
+  howCol: { flex: 1, alignItems: 'center', gap: spacing.sm },
+  howIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  howText: { fontSize: 10, lineHeight: 14, color: MUTED, textAlign: 'center', fontWeight: '600' },
 });

@@ -9,11 +9,13 @@ import type { GeneratedWorkout } from '../types/ai-coach.types';
 
 interface Props {
   onSelectWorkout: (workout: GeneratedWorkout) => void;
+  variant?: 'default' | 'premium';
 }
 
-export function SavedWorkoutsList({ onSelectWorkout }: Props) {
+export function SavedWorkoutsList({ onSelectWorkout, variant = 'default' }: Props) {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
+  const premium = variant === 'premium';
   const { savedWorkouts, deleteSavedWorkout } = useAiCoachStore();
   const { user } = useAuthStore();
 
@@ -33,11 +35,11 @@ export function SavedWorkoutsList({ onSelectWorkout }: Props) {
   if (savedWorkouts.length === 0) {
     return (
       <View style={styles.empty}>
-        <Ionicons name="fitness-outline" size={48} color={theme.textMuted} />
-        <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>
+        <Ionicons name="fitness-outline" size={48} color={premium ? 'rgba(255,255,255,0.45)' : theme.textMuted} />
+        <Text style={[styles.emptyTitle, { color: premium ? '#fff' : theme.textSecondary }]}>
           No saved workouts yet
         </Text>
-        <Text style={[styles.emptyDesc, { color: theme.textMuted }]}>
+        <Text style={[styles.emptyDesc, { color: premium ? 'rgba(255,255,255,0.55)' : theme.textMuted }]}>
           Generate a workout and save it to see it here
         </Text>
       </View>
@@ -56,13 +58,13 @@ export function SavedWorkoutsList({ onSelectWorkout }: Props) {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={[theme.card, theme.surface]}
+            colors={premium ? ['rgba(255,255,255,0.07)', 'rgba(255,255,255,0.03)'] : [theme.card, theme.surface]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.card, { borderColor: theme.border }]}
+            style={[styles.card, { borderColor: premium ? 'rgba(255,255,255,0.09)' : theme.border }]}
           >
             <View style={styles.cardBody}>
-              <Text style={[styles.title, { color: theme.textPrimary }]} numberOfLines={1}>
+              <Text style={[styles.title, { color: premium ? '#fff' : theme.textPrimary }]} numberOfLines={1}>
                 {item.title}
               </Text>
               <Text style={[styles.meta, { color: theme.textSecondary }]}>

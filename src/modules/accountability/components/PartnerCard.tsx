@@ -28,7 +28,7 @@ export function PartnerCard({
   return (
     <View style={[styles.container, {
       backgroundColor: theme.card,
-      borderColor: theme.accent,
+      borderColor: theme.border,
     }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     padding: spacing.lg,
     borderRadius: radius.xl,
-    borderWidth: 2,
+    borderWidth: 1,
     gap: spacing.md,
   },
   header: {

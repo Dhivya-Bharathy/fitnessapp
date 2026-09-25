@@ -23,12 +23,10 @@ import { supabase } from '../../services/supabase';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ComebackBanner } from '../../components/ComebackBanner';
 import { BurnoutBanner } from '../../components/BurnoutBanner';
-import {
-  PastelScreenBackground,
-  GlassCard,
-  glassSurface,
-  isWellnessLight,
-} from '../../components/wellness';
+import { GlassCard, isWellnessLight } from '../../components/wellness'; // wellness used by legacy subcomponents
+import { PremiumHomeDashboard } from '../../components/home/PremiumHomeDashboard';
+import { PremiumAtmosphereBackground } from '../../components/premium/PremiumAtmosphereBackground';
+import { PREMIUM_BG as PREMIUM_HOME_BG } from '../../components/premium/premiumEffects';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDE_GAP = 12;
@@ -467,8 +465,6 @@ export default function HomeScreen() {
   const { colorScheme } = useThemeStore();
   const { user, profile, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
-  const wellness = isWellnessLight(colorScheme);
-
   // Steps Tracker from Zustand Authstore state
    const stepGoal  = (profile as any)?.step_goal ?? 10000;
     const liveSteps = useAuthStore((s) => s.liveSteps);
@@ -483,8 +479,6 @@ export default function HomeScreen() {
   const waterGoalMl = (profile as any)?.water_goal_ml ?? 2500;
   const streakCount = (profile as any)?.streak_count ?? 0;
   const displayName = profile?.full_name?.trim() || profile?.calfit_id || user?.email?.split('@')[0] || 'there';
-  const handle = profile?.calfit_id?.trim();
-
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -527,78 +521,38 @@ export default function HomeScreen() {
   const onRefresh = () => { setIsRefreshing(true); loadData(); };
 
   return (
-    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
-      {wellness && <PastelScreenBackground />}
-      {/* HEADER */}
-      <View style={[styles.header, !wellness && { borderBottomColor: theme.border }]}>
-        <View>
-          <Text style={[styles.greeting, { color: theme.textSecondary }]}>{greeting} 👋</Text>
-          <Text style={[styles.name, { color: theme.textPrimary }]}>{displayName}</Text>
-          {handle ? (
-            <Text style={[styles.handle, { color: theme.textMuted }]}>@{handle}</Text>
-          ) : null}
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Notifications')}
-            style={[
-              styles.headerIconBtn,
-              wellness
-                ? [glassSurface('rgba(255,255,255,0.75)'), { borderColor: 'rgba(255,255,255,0.9)' }]
-                : { backgroundColor: theme.card, borderColor: theme.border },
-            ]}>
-            <Ionicons name="notifications-outline" size={22} color={theme.textPrimary} />
-            {unreadCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.gradStart }]}>
-                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Avatar size={38} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
+    <AndroidSafeView backgroundColor={PREMIUM_HOME_BG} style={styles.safe}>
+      <PremiumAtmosphereBackground />
       <ScreenScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor="#2DDC8C"
+            colors={['#2DDC8C']}
+          />
+        }
       >
-        {/* ── COMEBACK BANNER — only shows if inactive 2+ days ── */}
         {user?.id && <ComebackBanner userId={user.id} theme={theme} />}
-
-        {/* ── BURNOUT BANNER — reminds to rest when sleep low + activity high ── */}
         {user?.id && <BurnoutBanner userId={user.id} theme={theme} />}
 
-        {/* 1. Streak — fixed, always visible */}
-        <StreakRow theme={theme} streakCount={streakCount} wellness={wellness} />
-
-        {/* 2. Carousel — slides: Calories → Macros → Water/Steps/Sleep */}
-        <HeroCarousel
-          theme={theme}
-          consumed={caloriesConsumed} goal={calorieGoal}
-          waterMl={waterMl} waterGoalMl={waterGoalMl}
-          liveSteps={liveSteps} stepGoal={stepGoal} sleepHrs={sleepHrs}
+        <PremiumHomeDashboard
+          greeting={greeting}
+          displayName={displayName}
+          unreadCount={unreadCount}
+          streakCount={streakCount}
+          caloriesConsumed={caloriesConsumed}
+          calorieGoal={calorieGoal}
+          waterMl={waterMl}
+          waterGoalMl={waterGoalMl}
+          liveSteps={liveSteps}
+          stepGoal={stepGoal}
+          sleepHrs={sleepHrs}
+          onWaterLog={handleWaterLog}
+          onSleepLog={() => navigation.navigate('Sleep')}
         />
-
-        {/* 3. Stat cards — static quick-glance below carousel */}
-        <StatCards
-          theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl}
-          liveSteps={liveSteps} stepGoal={stepGoal} sleepHrs={sleepHrs}
-          wellness={wellness}
-        />
-
-        <View style={styles.sectionPad}>
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Quick Log</Text>
-          <QuickLog theme={theme} onWaterLog={handleWaterLog} onSleepLog={() => navigation.navigate('Sleep')} />
-        </View>
-
-        <View style={styles.sectionPad}>
-          <PartnersSection theme={theme} />
-          <View style={{ height: spacing.sm }} />
-          <HomeStreaksSection theme={theme} streakCount={streakCount} />
-        </View>
         <View style={{ height: spacing.xl }} />
       </ScreenScrollView>
     </AndroidSafeView>

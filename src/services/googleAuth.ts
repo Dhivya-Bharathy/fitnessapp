@@ -7,10 +7,14 @@ WebBrowser.maybeCompleteAuthSession();
 
 function getOAuthRedirectUrl(): string {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const fromEnv = process.env.EXPO_PUBLIC_OAUTH_REDIRECT_URL?.trim();
+    if (fromEnv) {
+      return fromEnv.replace(/\/$/, '') || fromEnv;
+    }
     const url = new URL(window.location.href);
     url.search = '';
     url.hash = '';
-    return `${url.origin}${url.pathname || '/'}`;
+    return `${url.origin}${url.pathname || '/'}`.replace(/\/$/, '') || url.origin;
   }
   return Linking.createURL('/');
 }

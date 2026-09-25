@@ -7,9 +7,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { colors, spacing, radius, fontSize } from '../../theme';
-import { useThemeStore } from '../../store/themeStore';
+import { spacing, radius, fontSize } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
+import { PremiumAtmosphereBackground } from '../../components/premium/PremiumAtmosphereBackground';
+import {
+  PREMIUM_BG,
+  PREMIUM_TEXT,
+  PREMIUM_MUTED,
+  PREMIUM_ACCENT,
+  PREMIUM_GLASS,
+  PREMIUM_GLASS_BORDER,
+} from '../../components/premium/premiumEffects';
+import { caloriePremiumTheme } from '../../components/calorie/PremiumCalorieUI';
 import { useMealPlanStore } from '../../store/mealPlanStore';
 import type { GeneratedMealPlan } from '../../types/ai-coach.types';
 
@@ -23,33 +32,35 @@ interface QStep {
 }
 
 const STEPS: QStep[] = [
-  { key: 'goal', question: "What's your health goal?", subtitle: 'This helps me tailor your meal plan', icon: 'flag-outline' },
-  { key: 'budget', question: 'What budget do you have?', subtitle: "Tell me how much you're planning to spend", icon: 'wallet-outline' },
+  {
+    key: 'basics',
+    question: 'Create Your Meal Plan',
+    subtitle: 'Goals, budget, and food preferences',
+    icon: 'sparkles-outline',
+  },
   { key: 'cuisine', question: 'What cuisine do you prefer?', subtitle: 'I know local Indian ingredients too!', icon: 'restaurant-outline' },
-  { key: 'dietary', question: 'Any dietary preferences?', subtitle: 'Choose all that apply', icon: 'leaf-outline' },
-  { key: 'meals', question: 'How many meals per day?', subtitle: '2-5 meals including snacks', icon: 'time-outline' },
   { key: 'exclude', question: 'Any foods to avoid?', subtitle: 'Not a fan of anything? Let me know', icon: 'close-circle-outline' },
   { key: 'calories', question: 'Daily calorie target?', subtitle: "I'll auto-calculate based on your goal if you're not sure", icon: 'flame-outline' },
+  { key: 'review', question: 'Ready to generate?', subtitle: 'Review your choices — you can go back to edit', icon: 'checkmark-done-outline' },
 ];
 
-const HEALTH_GOALS = [
-  { key: 'weight_loss', label: 'Lose Weight', icon: 'trending-down', color: '#FF6B35' },
-  { key: 'muscle_gain', label: 'Build Muscle', icon: 'fitness', color: '#2DDC8C' },
-  { key: 'maintain', label: 'Stay Fit', icon: 'happy', color: '#4A90E2' },
-  { key: 'heart_health', label: 'Heart Health', icon: 'pulse', color: '#FF5959' },
-  { key: 'more_energy', label: 'More Energy', icon: 'flash', color: '#FFB830' },
+const PRIMARY_GOALS = [
+  { key: 'weight_loss', label: 'Weight Loss', icon: 'trending-down-outline' },
+  { key: 'muscle_gain', label: 'Muscle Gain', icon: 'fitness-outline' },
+  { key: 'maintain', label: 'Maintain Weight', icon: 'scale-outline' },
+  { key: 'more_energy', label: 'Better Health', icon: 'heart-outline' },
 ];
 
-const BUDGET_OPTIONS = [
-  { key: 'fixed', label: 'I have a budget', icon: 'card-outline', desc: 'Enter how much you plan to spend' },
-  { key: 'auto', label: 'Calculate for me', icon: 'sparkles-outline', desc: "I'll suggest affordable options based on local prices" },
+const FOOD_PREF_CHIPS = [
+  { key: 'vegetarian', label: 'Vegetarian', store: 'vegetarian' },
+  { key: 'non_vegetarian', label: 'Non-Vegetarian', store: 'high_protein' },
+  { key: 'jain', label: 'Jain', store: 'jain' },
+  { key: 'eggetarian', label: 'Eggetarian', store: 'eggetarian' },
+  { key: 'dairy_free', label: 'No Dairy', store: 'dairy_free' },
+  { key: 'gluten_free', label: 'No Gluten', store: 'gluten_free' },
 ];
 
-const BUDGET_PERIODS = [
-  { key: 'day', label: 'Per Day', icon: 'sunny-outline' },
-  { key: 'week', label: 'Per Week', icon: 'calendar-outline' },
-  { key: 'month', label: 'Per Month', icon: 'calendar-number-outline' },
-];
+const BUDGET_DAY_MAX = 1500;
 
 const CUISINE_STYLES = [
   { key: 'indian', label: 'Indian 🇮🇳', desc: 'Dal, roti, biryani, dosa & more' },
@@ -61,17 +72,10 @@ const CUISINE_STYLES = [
   { key: 'american', label: 'American', desc: 'Burgers, grilled food, salads' },
 ];
 
-const DIETARY_PRESETS = [
-  'balanced', 'high_protein', 'low_carb', 'vegetarian',
-  'vegan', 'mediterranean', 'keto', 'gluten_free',
-  'dairy_free', 'halal',
-];
-
 export default function MealPlanScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useThemeStore();
-  const theme = colors[colorScheme];
+  const theme = caloriePremiumTheme;
   const { user } = useAuthStore();
   const store = useMealPlanStore();
   const [activeTab, setActiveTab] = useState<Tab>('generate');
@@ -79,9 +83,12 @@ export default function MealPlanScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const [healthGoal, setHealthGoal] = useState('');
+  const [dailyBudget, setDailyBudget] = useState(500);
+  const [budgetTrackWidth, setBudgetTrackWidth] = useState(1);
+  const [foodPrefKeys, setFoodPrefKeys] = useState<string[]>([]);
   const [budgetMode, setBudgetMode] = useState<'fixed' | 'auto' | null>(null);
   const [budgetAmount, setBudgetAmount] = useState('');
-  const [budgetPeriod, setBudgetPeriod] = useState<'day' | 'week' | 'month'>('week');
+  const [budgetPeriod, setBudgetPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [cuisineStyle, setCuisineStyle] = useState('any');
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [mealsPerDay, setMealsPerDay] = useState(3);
@@ -114,33 +121,64 @@ export default function MealPlanScreen() {
     }, [user])
   );
 
-  const toggleDietary = (pref: string) => {
-    setDietaryPrefs(prev =>
-      prev.includes(pref) ? prev.filter(p => p !== pref) : [...prev, pref]
-    );
+  const toggleFoodPref = (chipKey: string, storeKey: string) => {
+    setFoodPrefKeys(prev => {
+      const turningOff = prev.includes(chipKey);
+      let nextKeys = turningOff ? prev.filter(k => k !== chipKey) : [...prev, chipKey];
+      if (!turningOff && chipKey === 'vegetarian') nextKeys = nextKeys.filter(k => k !== 'non_vegetarian');
+      if (!turningOff && chipKey === 'non_vegetarian') nextKeys = nextKeys.filter(k => k !== 'vegetarian');
+
+      setDietaryPrefs(dprefs => {
+        let nextPrefs = turningOff ? dprefs.filter(p => p !== storeKey) : [...dprefs, storeKey];
+        if (!turningOff && chipKey === 'vegetarian') nextPrefs = nextPrefs.filter(p => p !== 'high_protein');
+        if (!turningOff && chipKey === 'non_vegetarian') nextPrefs = nextPrefs.filter(p => p !== 'vegetarian');
+        return nextPrefs;
+      });
+      return nextKeys;
+    });
+  };
+
+  const setBudgetFromRatio = (ratio: number) => {
+    const raw = Math.round(ratio * BUDGET_DAY_MAX / 50) * 50;
+    const clamped = Math.max(0, Math.min(BUDGET_DAY_MAX, raw));
+    setDailyBudget(clamped);
+    if (clamped <= 0) {
+      setBudgetMode('auto');
+      setBudgetAmount('');
+    } else {
+      setBudgetMode('fixed');
+      setBudgetAmount(String(clamped));
+      setBudgetPeriod('day');
+    }
   };
 
   const canProceed = () => {
     switch (step.key) {
-      case 'goal': return healthGoal !== '';
-      case 'budget': return budgetMode !== null;
+      case 'basics': return healthGoal !== '';
       case 'cuisine': return cuisineStyle !== '';
-      case 'dietary': return true;
-      case 'meals': return true;
       case 'exclude': return true;
       case 'calories': return true;
+      case 'review': return true;
       default: return true;
     }
   };
 
+  const goalLabel = PRIMARY_GOALS.find(g => g.key === healthGoal)?.label ?? healthGoal;
+
   const handleGenerate = async () => {
     if (!user) return;
 
-    const budgetLevel = budgetMode === 'auto'
-      ? (healthGoal === 'weight_loss' ? 'low' : 'moderate')
-      : budgetAmount
-        ? (parseInt(budgetAmount) < 5000 ? 'low' : parseInt(budgetAmount) < 15000 ? 'moderate' : 'high')
-        : 'moderate';
+    const dayBudget = dailyBudget > 0 ? dailyBudget : budgetPeriod === 'day' ? parseInt(budgetAmount) || 0 : 0;
+    const budgetLevel =
+      budgetMode === 'auto' || dayBudget <= 0
+        ? healthGoal === 'weight_loss'
+          ? 'low'
+          : 'moderate'
+        : dayBudget < 400
+          ? 'low'
+          : dayBudget < 900
+            ? 'moderate'
+            : 'high';
 
     const calTarget = caloriesTarget
       ? parseInt(caloriesTarget)
@@ -185,9 +223,11 @@ export default function MealPlanScreen() {
     setStepIndex(0);
     setStarted(false);
     setHealthGoal('');
+    setDailyBudget(500);
+    setFoodPrefKeys([]);
     setBudgetMode(null);
     setBudgetAmount('');
-    setBudgetPeriod('week');
+    setBudgetPeriod('day');
     setCuisineStyle('any');
     setDietaryPrefs([]);
     setMealsPerDay(3);
@@ -197,25 +237,17 @@ export default function MealPlanScreen() {
   };
 
   const renderTabBar = () => (
-    <View style={[styles.tabBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <View style={styles.tabBar}>
       {(['generate', 'saved'] as Tab[]).map((tab) => {
         const isActive = activeTab === tab;
         return (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
-            activeOpacity={0.7}
-            style={[styles.tabItem, isActive && { backgroundColor: theme.accent }]}
+            activeOpacity={0.88}
+            style={[styles.tabItem, isActive && styles.tabItemActive]}
           >
-            <Ionicons
-              name={tab === 'generate' ? 'sparkles' : 'bookmark'}
-              size={16}
-              color={isActive ? '#fff' : theme.textMuted}
-            />
-            <Text style={[styles.tabLabel, {
-              color: isActive ? '#fff' : theme.textMuted,
-              fontWeight: isActive ? '700' : '500',
-            }]}>
+            <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
               {tab === 'generate' ? 'Generate' : 'Saved'}
             </Text>
           </TouchableOpacity>
@@ -237,115 +269,138 @@ export default function MealPlanScreen() {
         <TouchableOpacity onPress={prevStep} hitSlop={8} style={styles.stepBackBtn}>
           <Ionicons name="chevron-back" size={18} color={stepIndex > 0 ? theme.textPrimary : 'transparent'} />
         </TouchableOpacity>
-        <Text style={[styles.stepCount, { color: theme.textMuted }]}>Step {stepIndex + 1} of {STEPS.length}</Text>
+        <Text style={[styles.stepCount, { color: theme.textMuted }]}>{stepIndex + 1} of {STEPS.length}</Text>
         <View style={{ width: 24 }} />
       </View>
     </View>
   );
 
+  const renderBasicsStep = () => {
+    const budgetPct = dailyBudget / BUDGET_DAY_MAX;
+    const thumbLeft = Math.max(0, Math.min(1, budgetPct));
+
+    return (
+      <View style={styles.stepOptions}>
+        <Text style={[styles.sectionLabel, { color: theme.textPrimary }]}>Primary Goal</Text>
+        <View style={styles.goalGrid}>
+          {PRIMARY_GOALS.map(g => {
+            const selected = healthGoal === g.key;
+            return (
+              <TouchableOpacity
+                key={g.key}
+                onPress={() => setHealthGoal(g.key)}
+                activeOpacity={0.85}
+                style={[
+                  styles.goalTile,
+                  {
+                    backgroundColor: selected ? theme.accent + '14' : theme.card,
+                    borderColor: selected ? theme.accent : theme.border,
+                  },
+                ]}
+              >
+                <Ionicons name={g.icon as any} size={20} color={selected ? theme.accent : theme.textMuted} />
+                <Text style={[styles.goalTileLabel, { color: selected ? theme.accent : theme.textPrimary }]}>
+                  {g.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: theme.textPrimary, marginTop: spacing.lg }]}>
+          Daily Budget <Text style={{ color: theme.textMuted, fontWeight: '500' }}>(Optional)</Text>
+        </Text>
+        <View style={styles.budgetSliderWrap}>
+          <View style={[styles.budgetTooltip, { backgroundColor: theme.accent }]}>
+            <Text style={styles.budgetTooltipText}>
+              {dailyBudget <= 0 ? 'Flexible budget' : `₹${dailyBudget}/day`}
+            </Text>
+          </View>
+          <View
+            style={[styles.budgetTrack, { backgroundColor: theme.border }]}
+            onLayout={e => setBudgetTrackWidth(e.nativeEvent.layout.width)}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={e => setBudgetFromRatio(e.nativeEvent.locationX / budgetTrackWidth)}
+            onResponderMove={e => setBudgetFromRatio(e.nativeEvent.locationX / budgetTrackWidth)}
+          >
+            <View style={[styles.budgetFill, { width: `${thumbLeft * 100}%`, backgroundColor: theme.accent }]} />
+            <View
+              style={[
+                styles.budgetThumb,
+                { left: `${thumbLeft * 100}%`, borderColor: theme.accent, backgroundColor: PREMIUM_BG },
+              ]}
+            />
+          </View>
+          <View style={styles.budgetRangeLabels}>
+            <Text style={[styles.budgetRangeText, { color: theme.textMuted }]}>₹0</Text>
+            <Text style={[styles.budgetRangeText, { color: theme.textMuted }]}>₹1,500</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: theme.textPrimary, marginTop: spacing.lg }]}>Food Preferences</Text>
+        <View style={styles.chipRow}>
+          {FOOD_PREF_CHIPS.map(chip => {
+            const selected = foodPrefKeys.includes(chip.key);
+            return (
+              <TouchableOpacity
+                key={chip.key}
+                onPress={() => toggleFoodPref(chip.key, chip.store)}
+                activeOpacity={0.7}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: selected ? theme.accent + '22' : theme.card,
+                    borderColor: selected ? theme.accent : theme.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.chipText, { color: selected ? theme.accent : theme.textSecondary }]}>
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: theme.textPrimary, marginTop: spacing.lg }]}>Meals per Day</Text>
+        <View style={styles.mealsRow}>
+          {[2, 3, 4, 5].map(n => (
+            <TouchableOpacity
+              key={n}
+              onPress={() => setMealsPerDay(n)}
+              activeOpacity={0.7}
+              style={[
+                styles.mealCountCard,
+                {
+                  backgroundColor: mealsPerDay === n ? theme.accent : theme.card,
+                  borderColor: mealsPerDay === n ? theme.accent : theme.border,
+                },
+              ]}
+            >
+              <Text style={[styles.mealCountNum, { color: mealsPerDay === n ? '#fff' : theme.textPrimary }]}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          onPress={nextStep}
+          disabled={!canProceed()}
+          activeOpacity={0.9}
+          style={[styles.nextBtnWrap, { opacity: canProceed() ? 1 : 0.45 }]}
+        >
+          <LinearGradient colors={[PREMIUM_ACCENT, '#28C07A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.nextBtn}>
+            <Text style={styles.nextBtnText}>Next →</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderStepContent = () => {
     switch (step.key) {
-      case 'goal':
-        return (
-          <View style={styles.stepOptions}>
-            {HEALTH_GOALS.map(g => {
-              const selected = healthGoal === g.key;
-              return (
-                <TouchableOpacity key={g.key} onPress={() => { setHealthGoal(g.key); nextStep(); }}
-                  activeOpacity={0.8}
-                  style={[styles.goalCard, {
-                    backgroundColor: selected ? g.color + '20' : theme.card,
-                    borderColor: selected ? g.color : theme.border,
-                    borderWidth: selected ? 2 : 1,
-                  }]}>
-                  <View style={[styles.goalIconWrap, { backgroundColor: selected ? g.color : g.color + '15' }]}>
-                    <Ionicons name={g.icon as any} size={22} color={selected ? '#fff' : g.color} />
-                  </View>
-                  <Text style={[styles.goalLabel, { color: selected ? g.color : theme.textPrimary }]}>{g.label}</Text>
-                  {selected && <Ionicons name="checkmark-circle" size={20} color={g.color} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        );
-
-      case 'budget':
-        return (
-          <View style={styles.stepOptions}>
-            {BUDGET_OPTIONS.map(b => {
-              const selected = budgetMode === b.key;
-              return (
-                <TouchableOpacity key={b.key} onPress={() => setBudgetMode(b.key as any)}
-                  activeOpacity={0.8}
-                  style={[styles.budgetModeCard, {
-                    backgroundColor: selected ? theme.accent + '18' : theme.card,
-                    borderColor: selected ? theme.accent : theme.border,
-                    borderWidth: selected ? 2 : 1,
-                  }]}>
-                  <View style={[styles.budgetModeIcon, { backgroundColor: selected ? theme.accent + '30' : theme.border }]}>
-                    <Ionicons name={b.icon as any} size={24} color={selected ? theme.accent : theme.textMuted} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.budgetModeLabel, { color: selected ? theme.accent : theme.textPrimary }]}>{b.label}</Text>
-                    <Text style={[styles.budgetModeDesc, { color: theme.textMuted }]}>{b.desc}</Text>
-                  </View>
-                  {selected && <Ionicons name="checkmark-circle" size={22} color={theme.accent} />}
-                </TouchableOpacity>
-              );
-            })}
-
-            {budgetMode === 'fixed' && (
-              <Animated.View style={{ opacity: fadeAnim, marginTop: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>How much can you spend?</Text>
-                <View style={[styles.amountRow, { borderColor: theme.border, backgroundColor: theme.bg }]}>
-                  <Text style={[styles.currencySign, { color: theme.textPrimary }]}>₦</Text>
-                  <TextInput
-                    value={budgetAmount}
-                    onChangeText={setBudgetAmount}
-                    keyboardType="number-pad"
-                    placeholder="e.g. 5000"
-                    placeholderTextColor={theme.textMuted}
-                    style={[styles.amountInput, { color: theme.textPrimary }]}
-                  />
-                </View>
-                <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: spacing.md }]}>Per</Text>
-                <View style={styles.periodRow}>
-                  {BUDGET_PERIODS.map(p => {
-                    const sel = budgetPeriod === p.key;
-                    return (
-                      <TouchableOpacity key={p.key} onPress={() => setBudgetPeriod(p.key as any)}
-                        activeOpacity={0.7}
-                        style={[styles.periodChip, {
-                          backgroundColor: sel ? theme.accent : theme.card,
-                          borderColor: sel ? theme.accent : theme.border,
-                        }]}>
-                        <Ionicons name={p.icon as any} size={14} color={sel ? '#fff' : theme.textMuted} />
-                        <Text style={[styles.periodChipText, { color: sel ? '#fff' : theme.textSecondary }]}>{p.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </Animated.View>
-            )}
-
-            {budgetMode === 'auto' && (
-              <Animated.View style={{ opacity: fadeAnim }}>
-                <View style={[styles.autoBudgetCard, { backgroundColor: theme.accent + '10', borderColor: theme.accent + '44' }]}>
-                  <Ionicons name="sparkles" size={20} color={theme.accent} />
-                  <Text style={[styles.autoBudgetText, { color: theme.textSecondary }]}>
-                    I'll calculate based on current local food prices and suggest affordable meals that fit your goals. For a tight budget, I focus on staple foods like rice, beans, yam, eggs, and seasonal veggies.
-                  </Text>
-                </View>
-              </Animated.View>
-            )}
-
-            {budgetMode && (
-              <TouchableOpacity onPress={nextStep} activeOpacity={0.85} style={[styles.continueBtn, { backgroundColor: theme.accent, marginTop: spacing.lg }]}>
-                <Text style={styles.continueBtnText}>Continue →</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        );
+      case 'basics':
+        return renderBasicsStep();
 
       case 'cuisine':
         return (
@@ -366,57 +421,6 @@ export default function MealPlanScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
-            <TouchableOpacity onPress={nextStep} activeOpacity={0.85} style={[styles.continueBtn, { backgroundColor: theme.accent }]}>
-              <Text style={styles.continueBtnText}>Continue →</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'dietary':
-        return (
-          <View style={styles.stepOptions}>
-            <View style={styles.chipRow}>
-              {DIETARY_PRESETS.map(pref => {
-                const selected = dietaryPrefs.includes(pref);
-                return (
-                  <TouchableOpacity key={pref} onPress={() => toggleDietary(pref)}
-                    activeOpacity={0.7}
-                    style={[styles.chip, {
-                      backgroundColor: selected ? theme.accent : theme.card,
-                      borderColor: selected ? theme.accent : theme.border,
-                    }]}>
-                    <Text style={[styles.chipText, { color: selected ? '#fff' : theme.textSecondary }]}>
-                      {pref.replace(/_/g, ' ')}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <TouchableOpacity onPress={nextStep} activeOpacity={0.85} style={[styles.continueBtn, { backgroundColor: theme.accent, marginTop: spacing.lg }]}>
-              <Text style={styles.continueBtnText}>{dietaryPrefs.length === 0 ? 'Skip →' : 'Continue →'}</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'meals':
-        return (
-          <View style={styles.stepOptions}>
-            <View style={styles.mealsRow}>
-              {[2, 3, 4, 5].map(n => (
-                <TouchableOpacity key={n} onPress={() => setMealsPerDay(n)}
-                  activeOpacity={0.7}
-                  style={[styles.mealCountCard, {
-                    backgroundColor: mealsPerDay === n ? theme.accent : theme.card,
-                    borderColor: mealsPerDay === n ? theme.accent : theme.border,
-                    borderWidth: mealsPerDay === n ? 2 : 1,
-                  }]}>
-                  <Text style={[styles.mealCountNum, { color: mealsPerDay === n ? '#fff' : theme.textPrimary }]}>{n}</Text>
-                  <Text style={[styles.mealCountLabel, { color: mealsPerDay === n ? 'rgba(255,255,255,0.7)' : theme.textMuted }]}>
-                    {n === 2 ? 'meals' : 'meals'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
             </View>
             <TouchableOpacity onPress={nextStep} activeOpacity={0.85} style={[styles.continueBtn, { backgroundColor: theme.accent }]}>
               <Text style={styles.continueBtnText}>Continue →</Text>
@@ -474,41 +478,89 @@ export default function MealPlanScreen() {
           </View>
         );
 
+      case 'review':
+        return (
+          <View style={styles.stepOptions}>
+            <View style={[styles.reviewCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              {[
+                ['Goal', goalLabel],
+                ['Budget', dailyBudget > 0 ? `₹${dailyBudget}/day` : 'Flexible (AI picks)'],
+                ['Meals', `${mealsPerDay} per day`],
+                ['Cuisine', CUISINE_STYLES.find(c => c.key === cuisineStyle)?.label ?? cuisineStyle],
+                [
+                  'Preferences',
+                  foodPrefKeys.length
+                    ? FOOD_PREF_CHIPS.filter(c => foodPrefKeys.includes(c.key)).map(c => c.label).join(', ')
+                    : 'None selected',
+                ],
+                ['Calories', caloriesTarget ? `${caloriesTarget} kcal/day` : 'Auto from goal'],
+              ].map(([label, value]) => (
+                <View key={label} style={[styles.reviewRow, { borderColor: theme.border }]}>
+                  <Text style={[styles.reviewLabel, { color: theme.textMuted }]}>{label}</Text>
+                  <Text style={[styles.reviewValue, { color: theme.textPrimary }]}>{value}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={handleGenerate}
+              disabled={store.isLoading}
+              activeOpacity={0.9}
+              style={[styles.nextBtnWrap, { opacity: store.isLoading ? 0.7 : 1 }]}
+            >
+              <LinearGradient colors={[PREMIUM_ACCENT, '#28C07A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.nextBtn}>
+                <Ionicons name="sparkles-outline" size={20} color={PREMIUM_BG} />
+                <Text style={styles.nextBtnText}>{store.isLoading ? 'Generating…' : 'Generate My Meal Plan'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        );
+
       default:
         return null;
     }
   };
 
   const renderWelcome = () => (
-    <View style={styles.welcomeContainer}>
-      <LinearGradient colors={['#2DDC8C', '#0A9A5E'] as [string, string]} style={styles.welcomeIconWrap}>
-        <Ionicons name="restaurant-outline" size={40} color="#fff" />
-      </LinearGradient>
-      <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>Smart Meal Plan</Text>
-      <Text style={[styles.welcomeSub, { color: theme.textSecondary }]}>
-        Answer a few questions and I'll create a personalized meal plan based on your budget, preferences, and goals — with local Indian ingredients in mind.
+    <ScrollView contentContainerStyle={styles.welcomeContainer} showsVerticalScrollIndicator={false}>
+      <View style={styles.welcomeHero}>
+        <Text style={styles.welcomeHeroEmoji}>🤖</Text>
+        <Text style={styles.welcomeHeroFood}>🥗</Text>
+      </View>
+      <Text style={styles.welcomeTitle}>Smart Meal Plan</Text>
+      <Text style={styles.welcomeSub}>
+        AI creates personalized meal plans based on your budget, preferences, and health goals — with local Indian ingredients in mind.
       </Text>
-      <View style={styles.welcomeFeatures}>
+      <View style={styles.featureGrid}>
         {[
-          { icon: 'wallet-outline', text: 'Works with any budget — even ₹500/day' },
-          { icon: 'restaurant-outline', text: 'Knows local Indian ingredients & prices' },
-          { icon: 'trending-down', text: 'Tailored to your health goals' },
-          { icon: 'sparkles-outline', text: 'AI-powered smart suggestions' },
-        ].map((f, i) => (
-          <View key={i} style={styles.welcomeFeatureRow}>
-            <Ionicons name={f.icon as any} size={16} color={theme.accent} />
-            <Text style={[styles.welcomeFeatureText, { color: theme.textSecondary }]}>{f.text}</Text>
+          { icon: 'cash-outline' as const, title: 'Budget', text: 'Works with any budget (e.g. ₹500/day)', color: PREMIUM_ACCENT },
+          { icon: 'leaf-outline' as const, title: 'Local', text: 'Knows local Indian ingredients & prices', color: '#4A90E2' },
+          { icon: 'heart-outline' as const, title: 'Goals', text: 'Tailored to your health goals', color: '#FF6B6B' },
+          { icon: 'sparkles-outline' as const, title: 'AI', text: 'AI-powered smart suggestions', color: '#B280FF' },
+        ].map((f) => (
+          <View key={f.title} style={styles.featureCell}>
+            <View style={[styles.featureIcon, { backgroundColor: f.color + '22' }]}>
+              <Ionicons name={f.icon} size={18} color={f.color} />
+            </View>
+            <Text style={styles.featureCellTitle}>{f.title}</Text>
+            <Text style={styles.featureCellText}>{f.text}</Text>
           </View>
         ))}
       </View>
-      <TouchableOpacity onPress={() => setStarted(true)} activeOpacity={0.85} style={styles.getStartedWrap}>
-        <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.getStartedBtn}>
+      <TouchableOpacity
+        onPress={() => {
+          setStarted(true);
+          setBudgetMode('fixed');
+          setBudgetAmount('500');
+          setBudgetPeriod('day');
+        }}
+        activeOpacity={0.9}
+        style={styles.getStartedWrap}
+      >
+        <LinearGradient colors={[PREMIUM_ACCENT, '#28C07A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.getStartedBtn}>
           <Text style={styles.getStartedText}>Get Started →</Text>
         </LinearGradient>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 
   const renderQuestionnaire = () => (
@@ -520,28 +572,24 @@ export default function MealPlanScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.stepHeaderCard, { backgroundColor: theme.accent + '08', borderColor: theme.accent + '22' }]}>
-          <View style={[styles.stepIconWrap, { backgroundColor: theme.accent + '18' }]}>
-            <Ionicons name={step.icon as any} size={24} color={theme.accent} />
+        {step.key !== 'basics' && (
+          <View style={[styles.stepHeaderCard, { backgroundColor: theme.accent + '08', borderColor: theme.accent + '22' }]}>
+            <View style={[styles.stepIconWrap, { backgroundColor: theme.accent + '18' }]}>
+              <Ionicons name={step.icon as any} size={24} color={theme.accent} />
+            </View>
+            <Text style={[styles.stepQuestion, { color: theme.textPrimary }]}>{step.question}</Text>
+            <Text style={[styles.stepSubtitle, { color: theme.textMuted }]}>{step.subtitle}</Text>
           </View>
-          <Text style={[styles.stepQuestion, { color: theme.textPrimary }]}>{step.question}</Text>
-          <Text style={[styles.stepSubtitle, { color: theme.textMuted }]}>{step.subtitle}</Text>
-        </View>
+        )}
 
         <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
           {renderStepContent()}
 
-          {step.key === 'goal' && (
-            <Text style={[styles.tapHint, { color: theme.textMuted }]}>Tap an option to continue</Text>
-          )}
-
           {step.key === 'calories' && (
-            <TouchableOpacity onPress={handleGenerate} disabled={store.isLoading} activeOpacity={0.8}
-              style={[styles.generateBtn, { backgroundColor: theme.accent, opacity: store.isLoading ? 0.7 : 1 }]}>
-              <Ionicons name="sparkles-outline" size={20} color="#fff" />
-              <Text style={styles.generateBtnText}>
-                {store.isLoading ? 'Generating...' : '✨ Generate My Meal Plan'}
-              </Text>
+            <TouchableOpacity onPress={nextStep} activeOpacity={0.9} style={styles.nextBtnWrap}>
+              <LinearGradient colors={[PREMIUM_ACCENT, '#28C07A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.nextBtn}>
+                <Text style={styles.nextBtnText}>Next →</Text>
+              </LinearGradient>
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -683,11 +731,14 @@ export default function MealPlanScreen() {
     if (store.savedPlans.length === 0) {
       return (
         <View style={styles.empty}>
-          <Ionicons name="restaurant-outline" size={48} color={theme.textMuted} />
-          <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>No saved meal plans</Text>
-          <Text style={[styles.emptyDesc, { color: theme.textMuted }]}>
+          <Ionicons name="bookmark-outline" size={48} color={PREMIUM_MUTED} />
+          <Text style={styles.emptyTitle}>No saved meal plans</Text>
+          <Text style={styles.emptyDesc}>
             Generate a meal plan and save it to see it here
           </Text>
+          <TouchableOpacity onPress={() => setActiveTab('generate')} style={styles.emptyCta}>
+            <Text style={styles.emptyCtaText}>Generate a plan</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -698,49 +749,80 @@ export default function MealPlanScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.savedList}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => setActiveTab('generate')}
-            activeOpacity={0.85}
-            style={[styles.savedCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-          >
-            <View style={styles.savedCardBody}>
-              <Text style={[styles.savedTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={[styles.savedMeta, { color: theme.textSecondary }]}>
-                {item.daily_calories} kcal  ·  {item.meals.length} meals  ·  {item.budget_level}
-              </Text>
-              <Text style={[styles.savedDate, { color: theme.textMuted }]}>
-                {new Date(item.created_at).toLocaleDateString()}
-              </Text>
+        renderItem={({ item, index }) => {
+          const isActive = index === 0;
+          const weeks = Math.max(1, Math.round(item.meals.length / 7)) || 4;
+          return (
+            <View style={[styles.savedCard, isActive && styles.savedCardActive]}>
+              {isActive && (
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeText}>ACTIVE PLAN</Text>
+                </View>
+              )}
+              <View style={styles.savedRow}>
+                <View style={styles.savedCardBody}>
+                  <Text style={styles.savedTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.savedMeta}>
+                    {item.daily_calories} kcal/day · {item.meals.length} meals
+                  </Text>
+                  <Text style={styles.savedTags}>
+                    {item.dietary_preferences?.[0]?.replace(/_/g, ' ') || 'Balanced'} · {weeks} weeks
+                  </Text>
+                </View>
+                <View style={styles.savedThumb}>
+                  <Text style={{ fontSize: 28 }}>🍲</Text>
+                </View>
+              </View>
+              <View style={styles.savedBtnRow}>
+                <TouchableOpacity
+                  style={[styles.viewPlanBtn, isActive && styles.viewPlanBtnFilled]}
+                  onPress={() => {
+                    useMealPlanStore.setState({ currentPlan: item });
+                    setActiveTab('generate');
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Text style={[styles.viewPlanText, isActive && { color: PREMIUM_BG }]}>View Plan →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editPlanBtn}
+                  onPress={() => { setActiveTab('generate'); setStarted(true); }}
+                  activeOpacity={0.88}
+                >
+                  <Ionicons name="create-outline" size={16} color={PREMIUM_MUTED} />
+                  <Text style={styles.editPlanText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={12}>
+                  <Ionicons name="trash-outline" size={18} color={theme.red} />
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.savedActions}>
-              <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={12} style={styles.deleteBtn}>
-                <Ionicons name="trash-outline" size={20} color={theme.red} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        )}
+          );
+        }}
       />
     );
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <PremiumAtmosphereBackground />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={[styles.backBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+            style={styles.backBtn}
           >
-            <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
+            <Ionicons name="chevron-back" size={22} color={PREMIUM_TEXT} />
           </TouchableOpacity>
           <View>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Meal Plans</Text>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-              {store.currentPlan ? 'Your meal plan is ready' : 'Smart AI meal planning'}
+            <Text style={styles.title}>Meal Plans</Text>
+            <Text style={styles.subtitle}>
+              {started && !store.currentPlan
+                ? 'Create Your Meal Plan'
+                : store.currentPlan
+                  ? 'Your meal plan is ready'
+                  : 'Smart AI meal planning'}
             </Text>
           </View>
         </View>
@@ -766,41 +848,51 @@ export default function MealPlanScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: PREMIUM_BG },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
     paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '800' },
-  subtitle: { fontSize: fontSize.sm, marginTop: 2 },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER, backgroundColor: PREMIUM_GLASS,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { fontSize: 24, fontWeight: '800', color: PREMIUM_TEXT },
+  subtitle: { fontSize: fontSize.sm, marginTop: 2, color: PREMIUM_MUTED },
 
   tabBar: {
     flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    borderRadius: 12, padding: 3, borderWidth: 1,
+    borderRadius: radius.full, padding: 4, borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER, backgroundColor: PREMIUM_GLASS,
   },
-  tabItem: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 8, borderRadius: 10,
-  },
-  tabLabel: { fontSize: fontSize.sm },
+  tabItem: { flex: 1, paddingVertical: 10, borderRadius: radius.full, alignItems: 'center' },
+  tabItemActive: { backgroundColor: PREMIUM_ACCENT },
+  tabLabel: { fontSize: fontSize.sm, fontWeight: '700', color: PREMIUM_MUTED },
+  tabLabelActive: { color: PREMIUM_BG },
 
   content: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: spacing.lg, paddingBottom: spacing.huge + 40 },
 
-  // Welcome
-  welcomeContainer: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, alignItems: 'center' },
-  welcomeIconWrap: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  welcomeTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginBottom: spacing.sm, textAlign: 'center' },
-  welcomeSub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl, paddingHorizontal: spacing.md },
-  welcomeFeatures: { width: '100%', gap: spacing.md, marginBottom: spacing.xl },
-  welcomeFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  welcomeFeatureText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
-  getStartedWrap: { width: '100%', borderRadius: radius.lg, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 }, web: { boxShadow: '0 4px 10px rgba(45,220,140,0.3)' } }) },
+  welcomeContainer: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, alignItems: 'center' },
+  welcomeHero: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.lg },
+  welcomeHeroEmoji: { fontSize: 56 },
+  welcomeHeroFood: { fontSize: 48 },
+  welcomeTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginBottom: spacing.sm, textAlign: 'center', color: PREMIUM_TEXT },
+  welcomeSub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 22, marginBottom: spacing.lg, paddingHorizontal: spacing.md, color: PREMIUM_MUTED },
+  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, width: '100%', marginBottom: spacing.xl },
+  featureCell: {
+    width: '47%', padding: spacing.md, borderRadius: radius.lg,
+    backgroundColor: PREMIUM_GLASS, borderWidth: 1, borderColor: PREMIUM_GLASS_BORDER,
+  },
+  featureIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  featureCellTitle: { fontSize: fontSize.sm, fontWeight: '800', color: PREMIUM_TEXT },
+  featureCellText: { fontSize: 10, color: PREMIUM_MUTED, marginTop: 4, lineHeight: 14 },
+  getStartedWrap: { width: '100%', borderRadius: radius.lg + 4, overflow: 'hidden' },
   getStartedBtn: { padding: spacing.lg, alignItems: 'center' },
-  getStartedText: { color: '#fff', fontSize: fontSize.xl, fontWeight: '800', letterSpacing: 0.5 },
+  getStartedText: { color: PREMIUM_BG, fontSize: fontSize.lg, fontWeight: '800' },
 
   // Step indicator
   stepIndicator: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
@@ -820,7 +912,40 @@ const styles = StyleSheet.create({
 
   // Step options
   stepOptions: { flex: 1 },
-  tapHint: { textAlign: 'center', fontSize: fontSize.xs, marginTop: spacing.lg, letterSpacing: 0.3 },
+  sectionLabel: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: spacing.sm },
+  goalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  goalTile: {
+    width: '47%', paddingVertical: spacing.md, paddingHorizontal: spacing.sm,
+    borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: 6,
+  },
+  goalTileLabel: { fontSize: fontSize.xs, fontWeight: '700', textAlign: 'center' },
+  budgetSliderWrap: { marginTop: spacing.xs },
+  budgetTooltip: {
+    alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 4,
+    borderRadius: radius.sm, marginBottom: spacing.sm,
+  },
+  budgetTooltipText: { color: PREMIUM_BG, fontSize: fontSize.xs, fontWeight: '800' },
+  budgetTrack: { height: 8, borderRadius: 4, justifyContent: 'center', overflow: 'visible' },
+  budgetFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4 },
+  budgetThumb: {
+    position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 2,
+    marginLeft: -11, top: -7,
+  },
+  budgetRangeLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm },
+  budgetRangeText: { fontSize: fontSize.xs, fontWeight: '600' },
+  nextBtnWrap: { width: '100%', borderRadius: radius.lg + 2, overflow: 'hidden', marginTop: spacing.xl },
+  nextBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, paddingVertical: spacing.lg,
+  },
+  nextBtnText: { color: PREMIUM_BG, fontSize: fontSize.lg, fontWeight: '800' },
+  reviewCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md },
+  reviewRow: {
+    flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md,
+    paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  reviewLabel: { fontSize: fontSize.sm, fontWeight: '600' },
+  reviewValue: { fontSize: fontSize.sm, fontWeight: '700', flex: 1, textAlign: 'right' },
 
   // Goal cards
   goalCard: {
@@ -876,11 +1001,10 @@ const styles = StyleSheet.create({
   // Meals per day
   mealsRow: { flexDirection: 'row', gap: spacing.md },
   mealCountCard: {
-    flex: 1, alignItems: 'center', padding: spacing.lg,
-    borderRadius: radius.lg, borderWidth: 1, gap: spacing.xs,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 }, web: { boxShadow: '0 2px 6px rgba(0,0,0,0.08)' } }),
+    flex: 1, alignItems: 'center', paddingVertical: spacing.md,
+    borderRadius: radius.lg, borderWidth: 1,
   },
-  mealCountNum: { fontSize: 36, fontWeight: '900', letterSpacing: -1 },
+  mealCountNum: { fontSize: 28, fontWeight: '900', letterSpacing: -1 },
   mealCountLabel: { fontSize: fontSize.xs, fontWeight: '600' },
 
   // Exclude
@@ -898,7 +1022,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: radius.lg,
     marginTop: spacing.lg, marginBottom: spacing.huge,
-    ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 }, web: { boxShadow: '0 4px 10px rgba(45,220,140,0.3)' } }),
   },
   generateBtnText: { color: '#fff', fontSize: fontSize.xl, fontWeight: '800' },
 
@@ -944,16 +1067,42 @@ const styles = StyleSheet.create({
   errorBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, position: 'absolute', bottom: 0, left: 0, right: 0 },
   errorText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
 
-  // Saved plans
   savedList: { padding: spacing.lg, paddingBottom: spacing.huge },
-  savedCard: { flexDirection: 'row', borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, marginBottom: spacing.md },
+  savedCard: {
+    borderRadius: radius.lg + 2, borderWidth: 1, borderColor: PREMIUM_GLASS_BORDER,
+    backgroundColor: PREMIUM_GLASS, padding: spacing.lg, marginBottom: spacing.md,
+  },
+  savedCardActive: { borderColor: 'rgba(45,220,140,0.35)' },
+  activeBadge: {
+    alignSelf: 'flex-start', backgroundColor: 'rgba(45,220,140,0.2)',
+    paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm, marginBottom: spacing.sm,
+  },
+  activeBadgeText: { fontSize: 9, fontWeight: '800', color: PREMIUM_ACCENT, letterSpacing: 0.5 },
+  savedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   savedCardBody: { flex: 1 },
-  savedTitle: { fontSize: fontSize.xl, fontWeight: '700' },
-  savedMeta: { fontSize: fontSize.md, marginTop: 4 },
-  savedDate: { fontSize: fontSize.sm, marginTop: 4 },
-  savedActions: { justifyContent: 'center', paddingLeft: spacing.md },
-  deleteBtn: { padding: spacing.sm },
+  savedTitle: { fontSize: fontSize.lg, fontWeight: '800', color: PREMIUM_TEXT },
+  savedMeta: { fontSize: fontSize.sm, marginTop: 4, color: PREMIUM_MUTED },
+  savedTags: { fontSize: fontSize.xs, marginTop: 4, color: PREMIUM_MUTED, textTransform: 'capitalize' },
+  savedThumb: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center',
+  },
+  savedBtnRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  viewPlanBtn: {
+    flex: 1, paddingVertical: spacing.sm + 2, borderRadius: radius.md,
+    borderWidth: 1, borderColor: PREMIUM_ACCENT, alignItems: 'center',
+  },
+  viewPlanBtnFilled: { backgroundColor: PREMIUM_ACCENT, borderColor: PREMIUM_ACCENT },
+  viewPlanText: { fontSize: fontSize.sm, fontWeight: '800', color: PREMIUM_ACCENT },
+  editPlanBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.md, borderWidth: 1, borderColor: PREMIUM_GLASS_BORDER,
+  },
+  editPlanText: { fontSize: fontSize.sm, fontWeight: '600', color: PREMIUM_MUTED },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl },
-  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700', marginTop: spacing.md },
-  emptyDesc: { fontSize: fontSize.base, textAlign: 'center', marginTop: spacing.sm },
+  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700', marginTop: spacing.md, color: PREMIUM_TEXT },
+  emptyDesc: { fontSize: fontSize.base, textAlign: 'center', marginTop: spacing.sm, color: PREMIUM_MUTED },
+  emptyCta: { marginTop: spacing.lg, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full, backgroundColor: PREMIUM_ACCENT },
+  emptyCtaText: { color: PREMIUM_BG, fontWeight: '800' },
 });

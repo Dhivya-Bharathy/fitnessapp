@@ -199,11 +199,11 @@ export default function WelcomeScreen() {
               <View key={line} style={[styles.listRow, compact && styles.listRowCompact]}>
                 <View style={styles.checkWrap}>
                   <Ionicons name="checkmark" size={16} color={ACCENT} />
-                </View>
+        </View>
                 <Text style={styles.listText}>{line}</Text>
-              </View>
-            ))}
-          </View>
+            </View>
+          ))}
+        </View>
         </View>
       </ScreenScrollView>
 
@@ -212,7 +212,7 @@ export default function WelcomeScreen() {
         onGetStarted={onGetStarted}
         bottomInset={insets.bottom}
       />
-    </View>
+      </View>
   );
 }
 
