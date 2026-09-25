@@ -1,8 +1,7 @@
 import { View, StyleSheet, Platform, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
 
-/** Shared dark scenic backdrop (mountains + soft nebula glow). */
+/** Shared dark backdrop with soft nebula glow (no bottom SVG — avoids bright artifacts on mobile web). */
 export function PremiumAtmosphereBackground() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -10,28 +9,13 @@ export function PremiumAtmosphereBackground() {
         colors={['#050608', '#0A1218', '#050608']}
         style={StyleSheet.absoluteFill}
       />
+      <LinearGradient
+        colors={['transparent', 'rgba(5,8,10,0.5)', '#050608']}
+        locations={[0, 0.45, 1]}
+        style={styles.bottomVignette}
+      />
       <View style={styles.nebulaTop} />
       <View style={styles.nebulaLeft} />
-      <Svg
-        width="100%"
-        height={220}
-        viewBox="0 0 400 220"
-        preserveAspectRatio="xMidYMax slice"
-        style={styles.mountains}
-      >
-        <Path
-          d="M0 220 L0 140 L60 100 L120 150 L200 70 L280 130 L360 90 L400 120 L400 220 Z"
-          fill="rgba(12,28,32,0.95)"
-        />
-        <Path
-          d="M0 220 L0 165 L80 130 L160 175 L260 115 L340 155 L400 140 L400 220 Z"
-          fill="rgba(8,18,22,0.98)"
-        />
-        <Path
-          d="M0 220 L0 185 L100 160 L220 190 L320 165 L400 180 L400 220 Z"
-          fill="#030506"
-        />
-      </Svg>
       {Platform.OS === 'web' && (
         <View
           style={
@@ -68,10 +52,11 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: 'rgba(178,128,255,0.03)',
   },
-  mountains: {
+  bottomVignette: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    height: 180,
   },
 });
