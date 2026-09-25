@@ -42,9 +42,18 @@
       "bundler": "metro",
       "output": "single",
       "meta": {
-        "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+        "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+        "description": "Your AI Health Companion — track, scan, plan, and get AI guidance.",
+        "og:title": "Fitness App — Your AI Health Companion",
+        "og:description": "Track • Scan • Plan • Get AI Guidance • Stay Healthy",
+        "og:image": "/og-image.jpg",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Fitness App — Your AI Health Companion",
+        "twitter:description": "Track • Scan • Plan • Get AI Guidance • Stay Healthy",
+        "twitter:image": "/og-image.jpg"
       },
-      "description": "Fitness App - AI Fitness & Nutrition Coach"
+      "description": "Your AI Health Companion — track, scan, plan, and get AI guidance."
     },
     "plugins": [
       "expo-font",

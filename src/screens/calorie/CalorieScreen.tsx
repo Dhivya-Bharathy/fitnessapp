@@ -7,7 +7,6 @@ import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { getTodayCalories, getTodayWater, logFood, logWater } from '../../services/profileService';
@@ -15,13 +14,20 @@ import { supabase } from '../../services/supabase';
 import { searchFoods } from '../../services/foodSearchService';
 import { lookupFoodNutrition, suggestRecipes } from '../../services/nvidia-client';
 import { CalorieTrendChart } from '../../components/TrendCharts';
-import {
-  PastelScreenBackground,
-  SegmentChips,
-  isWellnessLight,
-  WELLNESS_GREEN,
-} from '../../components/wellness';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
+import { PremiumAtmosphereBackground } from '../../components/premium/PremiumAtmosphereBackground';
+import { PREMIUM_BG, PREMIUM_TEXT, PREMIUM_MUTED, PREMIUM_ACCENT, PREMIUM_GLASS_BORDER } from '../../components/premium/premiumEffects';
+import {
+  caloriePremiumTheme,
+  PremiumCalorieToggle,
+  PremiumCalorieHero,
+  PremiumSuggestRecipes,
+  PremiumMacroRow,
+  PremiumWaterCard,
+  PremiumScanFoodCard,
+  PremiumMealSection,
+  PremiumMealPlanPanel,
+} from '../../components/calorie/PremiumCalorieUI';
 
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -495,11 +501,8 @@ const mp = StyleSheet.create({
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function CalorieScreen() {
   const navigation = useNavigation<any>();
-  const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
-  const theme = colors[colorScheme];
-  const wellness = isWellnessLight(colorScheme);
-  const trackAccent = wellness ? WELLNESS_GREEN : theme.accent;
+  const theme = caloriePremiumTheme;
 
   const [activeView, setActiveView]             = useState<'tracker' | 'mealplan'>('tracker');
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
@@ -564,31 +567,42 @@ export default function CalorieScreen() {
 
   const meals: { title: string; type: MealType }[] = [
     { title: 'Breakfast', type: 'breakfast' },
-    { title: 'Lunch',     type: 'lunch' },
-    { title: 'Dinner',    type: 'dinner' },
-    { title: 'Snacks',    type: 'snacks' },
+    { title: 'Lunch', type: 'lunch' },
+    { title: 'Dinner', type: 'dinner' },
+    { title: 'Snacks', type: 'snacks' },
   ];
 
+  const totalProtein = foodEntries.reduce((s, e) => s + (e.protein_g ?? 0), 0);
+  const totalCarbs = foodEntries.reduce((s, e) => s + (e.carbs_g ?? 0), 0);
+  const totalFat = foodEntries.reduce((s, e) => s + (e.fats_g ?? 0), 0);
+  const calRemaining = Math.max(calorieGoal - caloriesConsumed, 0);
+
   return (
-    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
-      {wellness && <PastelScreenBackground />}
+    <AndroidSafeView backgroundColor={PREMIUM_BG} style={styles.safe}>
+      <PremiumAtmosphereBackground />
       <View style={styles.header}>
         <View>
-          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Calorie Tracker</Text>
-          <Text style={[styles.pageDate, { color: theme.textSecondary }]}>
+          <Text style={[styles.pageTitle, { color: PREMIUM_TEXT }]}>Calorie Tracker</Text>
+          <Text style={[styles.pageDate, { color: PREMIUM_MUTED }]}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           {activeView === 'tracker' && (
             <>
-              <TouchableOpacity onPress={() => navigation.navigate('FoodScanner')}
-                activeOpacity={0.85} style={[styles.cameraBtn, { borderColor: theme.border }]}>
-                <Ionicons name="camera-outline" size={20} color={theme.accent} />
+              <TouchableOpacity
+                onPress={() => navigation.navigate('FoodScanner')}
+                activeOpacity={0.85}
+                style={[styles.cameraBtn, { borderColor: PREMIUM_GLASS_BORDER, backgroundColor: 'rgba(255,255,255,0.06)' }]}
+              >
+                <Ionicons name="camera-outline" size={20} color={PREMIUM_ACCENT} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
-                activeOpacity={0.85} style={styles.addBtn}>
-                <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} style={styles.addBtnGrad}>
+              <TouchableOpacity
+                onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
+                activeOpacity={0.85}
+                style={styles.addBtn}
+              >
+                <LinearGradient colors={['#FF6EB0', '#FF8C42']} style={styles.addBtnGrad}>
                   <Ionicons name="add" size={22} color="#fff" />
                 </LinearGradient>
               </TouchableOpacity>
@@ -597,59 +611,44 @@ export default function CalorieScreen() {
         </View>
       </View>
 
-      <SegmentChips
-        variant="segmented"
-        tabs={[
-          { id: 'tracker' as const, label: 'Tracker', icon: 'nutrition-outline', color: trackAccent },
-          { id: 'mealplan' as const, label: 'Meal Plan', icon: 'restaurant-outline', color: trackAccent },
-        ]}
-        active={activeView}
-        onChange={setActiveView}
-        theme={theme}
-      />
+      <PremiumCalorieToggle active={activeView} onChange={setActiveView} />
 
       {activeView === 'tracker' ? (
-        <ScreenScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
-
-          <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
-
-          <WaterCard theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
-
-          {/* Scan Food Card */}
-          <TouchableOpacity onPress={() => navigation.navigate('FoodScanner')} activeOpacity={0.85}
-            style={[styles.foodScanCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={styles.foodScanLeft}>
-              <View style={[styles.foodScanIconWrap, { backgroundColor: '#4A90E2' + '18' }]}>
-                <Ionicons name="camera-outline" size={22} color="#4A90E2" />
-              </View>
-              <View>
-                <Text style={[styles.foodScanTitle, { color: theme.textPrimary }]}>Scan Food</Text>
-                <Text style={[styles.foodScanSub, { color: theme.textMuted }]}>Snap a photo to log nutrition instantly</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-          </TouchableOpacity>
-          <Text style={[styles.scanDisclaimer, { color: theme.textMuted }]}>
+        <ScreenScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={PREMIUM_ACCENT} colors={[PREMIUM_ACCENT]} />
+          }
+        >
+          <PremiumCalorieHero consumed={caloriesConsumed} goal={calorieGoal} />
+          <PremiumSuggestRecipes remaining={calRemaining} />
+          <PremiumMacroRow protein={totalProtein} carbs={totalCarbs} fat={totalFat} />
+          <PremiumWaterCard waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
+          <PremiumScanFoodCard onPress={() => navigation.navigate('FoodScanner')} />
+          <Text style={[styles.scanDisclaimer, { color: PREMIUM_MUTED }]}>
             Camera estimates are approximate — always verify with nutrition labels
           </Text>
 
+          <Text style={[styles.todaysMeals, { color: PREMIUM_TEXT }]}>Today's Meals</Text>
           {meals.map((m) => (
-            <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
+            <PremiumMealSection
+              key={m.type}
+              title={m.title}
+              mealType={m.type}
               items={foodEntries.filter((e) => e.meal_type === m.type)}
-              onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }} />
+              onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }}
+            />
           ))}
 
-          <CalorieTrendChart
-            userId={user?.id ?? ''}
-            calorieGoal={calorieGoal}
-            theme={theme}
-          />
+          <View style={{ marginHorizontal: spacing.lg, marginTop: spacing.md }}>
+            <CalorieTrendChart userId={user?.id ?? ''} calorieGoal={calorieGoal} theme={theme} />
+          </View>
 
           <View style={{ height: 40 }} />
         </ScreenScrollView>
       ) : (
-        <MealPlanTab theme={theme} />
+        <PremiumMealPlanPanel />
       )}
 
       <AddFoodModal
@@ -782,5 +781,12 @@ const styles = StyleSheet.create({
   scanDisclaimer: {
     fontSize: fontSize.xs, textAlign: 'center', marginTop: -spacing.sm,
     marginBottom: spacing.md, paddingHorizontal: spacing.xl, lineHeight: 16,
+  },
+  todaysMeals: {
+    fontSize: fontSize.base,
+    fontWeight: '800',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

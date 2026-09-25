@@ -1,22 +1,31 @@
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Dimensions, Alert,
+  View, Text, StyleSheet, TouchableOpacity,
+  RefreshControl, Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useState, useCallback } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
-import { colors, spacing, radius, fontSize } from '../../theme';
+import { spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { MoodTrendChart } from '../../components/TrendCharts';
 import { exportProgressReport } from '../../utils/pdf-export';
-import { PastelScreenBackground, isWellnessLight, softCardShadow } from '../../components/wellness';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PremiumAtmosphereBackground } from '../../components/premium/PremiumAtmosphereBackground';
+import { PremiumSegmentedControl } from '../../components/premium/PremiumSegmentedControl';
+import {
+  PREMIUM_BG,
+  PREMIUM_TEXT,
+  PREMIUM_MUTED,
+  PREMIUM_ACCENT,
+  PREMIUM_GLASS,
+  PREMIUM_GLASS_BORDER,
+  premiumGlassShadow,
+} from '../../components/premium/premiumEffects';
+import { colors } from '../../theme';
 
-const { width: SW } = Dimensions.get('window');
 const PINK   = '#FF6B9D';
 const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';
@@ -47,7 +56,7 @@ async function loadStats(userId: string, period: Period) {
     supabase.from('sleep_logs').select('hours,date').eq('user_id', userId).gte('date', sinceStr),
     supabase.from('step_logs').select('steps,date').eq('user_id', userId).gte('date', sinceStr),
     supabase.from('profiles')
-      .select('streak_count,weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml,height_cm')
+      .select('streak_count,current_weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml,height_cm')
       .eq('id', userId).single(),
     supabase.from('body_measurements').select('id,user_id,chest_cm,waist_cm,hips_cm,arms_cm,thighs_cm,neck_cm,measured_at').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
   ]);
@@ -62,6 +71,9 @@ async function loadStats(userId: string, period: Period) {
 
   const totalCal    = foodData.reduce((s:number,r:any)=>s+(r.calories??0),0);
   const totalBurned = workoutData.reduce((s:number,r:any)=>s+(r.calories_burned??0),0);
+  const totalActiveMin = Math.round(
+    workoutData.reduce((s: number, r: any) => s + (r.duration_seconds ?? 0), 0) / 60,
+  );
   const totalWater  = waterData.reduce((s:number,r:any)=>s+(r.amount_ml??0),0);
   const totalSteps  = stepsData.reduce((s:number,r:any)=>s+(r.steps??0),0);
   // FIX: sleep column is `hours` not `duration_hours`
@@ -90,11 +102,11 @@ async function loadStats(userId: string, period: Period) {
   }));
 
   return {
-    totalCal, totalBurned, totalWater, totalSteps, avgSleep,
+    totalCal, totalBurned, totalActiveMin, totalWater, totalSteps, avgSleep,
     daysTracked: new Set(foodData.map((r:any)=>r.logged_at?.split('T')[0])).size,
     workoutsDone: workoutData.length,
     streak: p?.streak_count ?? 0,
-    weight: p?.weight_kg ?? null,
+    weight: p?.current_weight_kg ?? null,
     targetWeight: p?.target_weight_kg ?? null,
     calorieGoal: p?.daily_calorie_goal ?? 2000,
     waterGoal: p?.water_goal_ml ?? 2500,
@@ -106,9 +118,19 @@ async function loadStats(userId: string, period: Period) {
   };
 }
 
-function MiniBarChart({ data, goal, theme }: {
+const premiumChartTheme = {
+  bg: PREMIUM_BG,
+  card: PREMIUM_GLASS,
+  border: PREMIUM_GLASS_BORDER,
+  textPrimary: PREMIUM_TEXT,
+  textMuted: PREMIUM_MUTED,
+  textSecondary: PREMIUM_MUTED,
+  accent: PREMIUM_ACCENT,
+} as typeof colors.dark;
+
+function MiniBarChart({ data, goal }: {
   data: { label: string; calories: number }[];
-  goal: number; theme: typeof colors.dark;
+  goal: number;
 }) {
   const max = Math.max(...data.map(d => d.calories), goal, 1);
   return (
@@ -122,7 +144,7 @@ function MiniBarChart({ data, goal, theme }: {
           return (
             <View key={i} style={chart.barWrap}>
               <View style={[chart.bar, { height: Math.max(pct * 80, d.calories > 0 ? 4 : 0), backgroundColor: color }]} />
-              <Text style={[chart.label, { color: theme.textMuted }]}>{d.label}</Text>
+              <Text style={[chart.label, { color: PREMIUM_MUTED }]}>{d.label}</Text>
             </View>
           );
         })}
@@ -140,66 +162,67 @@ const chart = StyleSheet.create({
   goalLine:{ position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed' },
 });
 
-function StatCard({ icon, label, value, sub, color, theme }: {
-  icon: string; label: string; value: string; sub?: string;
-  color: string; theme: typeof colors.dark;
+function SummaryMetric({ icon, label, value, color }: {
+  icon: keyof typeof Ionicons.glyphMap; label: string; value: string; color: string;
 }) {
   return (
-    <View style={[sc.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[sc.icon, { backgroundColor: color + '18' }]}>
-        <Ionicons name={icon as any} size={18} color={color} />
+    <View style={sm.col}>
+      <View style={[sm.icon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon} size={18} color={color} />
       </View>
-      <Text style={[sc.value, { color: theme.textPrimary }]}>{value}</Text>
-      <Text style={[sc.label, { color: theme.textMuted }]}>{label}</Text>
-      {sub && <Text style={[sc.sub, { color: color }]}>{sub}</Text>}
+      <Text style={sm.value}>{value}</Text>
+      <Text style={sm.label}>{label}</Text>
     </View>
   );
 }
-const sc = StyleSheet.create({
-  card:  { flex: 1, minWidth: (SW - spacing.lg * 2 - spacing.sm) / 2, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: 3 },
-  icon:  { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
-  value: { fontSize: fontSize.xl, fontWeight: '800' },
-  label: { fontSize: fontSize.xs, fontWeight: '600' },
-  sub:   { fontSize: fontSize.xs, fontWeight: '700', marginTop: 1 },
+const sm = StyleSheet.create({
+  col: { flex: 1, alignItems: 'center', gap: 4 },
+  icon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  value: { fontSize: fontSize.lg, fontWeight: '900', color: PREMIUM_TEXT, letterSpacing: -0.3 },
+  label: { fontSize: 9, fontWeight: '600', color: PREMIUM_MUTED, textAlign: 'center' },
 });
 
-function SectionHeader({ title, icon, color, theme, onPress, actionLabel }: {
-  title: string; icon: string; color: string; theme: typeof colors.dark;
-  onPress?: () => void; actionLabel?: string;
-}) {
+function GlassSectionTitle({ title, icon, color }: { title: string; icon: keyof typeof Ionicons.glyphMap; color: string }) {
   return (
-    <View style={sh.row}>
-      <View style={sh.left}>
-        <View style={[sh.icon, { backgroundColor: color + '18' }]}>
-          <Ionicons name={icon as any} size={15} color={color} />
-        </View>
-        <Text style={[sh.title, { color: theme.textPrimary }]}>{title}</Text>
+    <View style={gst.row}>
+      <View style={[gst.icon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon} size={16} color={color} />
       </View>
-      {onPress && (
-        <TouchableOpacity onPress={onPress}>
-          <Text style={[sh.action, { color: color }]}>{actionLabel ?? 'See All'}</Text>
-        </TouchableOpacity>
-      )}
+      <Text style={gst.title}>{title}</Text>
     </View>
   );
 }
-const sh = StyleSheet.create({
-  row:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.lg, marginBottom: spacing.sm, marginTop: spacing.lg },
-  left:   { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  icon:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  title:  { fontSize: fontSize.base, fontWeight: '700' },
-  action: { fontSize: fontSize.sm, fontWeight: '600' },
+const gst = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  icon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: fontSize.base, fontWeight: '800', color: PREMIUM_TEXT },
 });
+
+const PERIOD_OPTIONS = [
+  { id: 'Week' as Period, label: 'Week' },
+  { id: 'Month' as Period, label: 'Month' },
+  { id: '3 Months' as Period, label: '3 Mo' },
+  { id: 'Year' as Period, label: 'Year' },
+];
+
+const PERIOD_RANGE_LABEL: Record<Period, string> = {
+  Week: 'This Week',
+  Month: 'This Month',
+  '3 Months': 'Last 3 Months',
+  Year: 'This Year',
+};
+
+function periodDayCount(period: Period) {
+  if (period === 'Week') return 7;
+  if (period === 'Month') return 30;
+  if (period === '3 Months') return 90;
+  return 365;
+}
 
 export default function ProgressScreen() {
   const navigation   = useNavigation<any>();
-  const { colorScheme } = useThemeStore();
+  const insets = useSafeAreaInsets();
   const { user, profile, liveSteps } = useAuthStore();
-  const theme = colors[colorScheme];
-  const wellness = isWellnessLight(colorScheme);
-
-  // Read streak directly from profile in authStore — always current, no DB round-trip needed
-  const streakCount = (profile as any)?.streak_count ?? 0;
 
   const [period, setPeriod]       = useState<Period>('Week');
   const [data, setData]           = useState<Awaited<ReturnType<typeof loadStats>> | null>(null);
@@ -215,8 +238,13 @@ export default function ProgressScreen() {
 
   const refresh = async () => { setIsRefreshing(true); await load(); setIsRefreshing(false); };
 
-  const PERIODS: Period[] = ['Week', 'Month', '3 Months', 'Year'];
   const name = profile?.full_name?.split(' ')[0] || 'You';
+  const spanDays = periodDayCount(period);
+  const avgCalories = data ? Math.round(data.totalCal / spanDays) : 0;
+  const avgSteps = data
+    ? Math.round((data.totalSteps > 0 ? data.totalSteps : liveSteps) / spanDays)
+    : 0;
+  const avgActiveMin = data ? Math.round(data.totalActiveMin / spanDays) : 0;
 
   const handleExportPDF = useCallback(async () => {
     if (!data) return;
@@ -233,64 +261,122 @@ export default function ProgressScreen() {
     ? Math.min(Math.abs(data.weight - data.targetWeight) / Math.abs((profile as any)?.starting_weight_kg - data.targetWeight || 1), 1)
     : 0;
 
+  const glassCard = [
+    styles.card,
+    premiumGlassShadow(),
+    { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER, marginHorizontal: spacing.lg },
+  ];
+
   return (
-    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
-      {wellness && <PastelScreenBackground />}
-      <LinearGradient
-        colors={[PURPLE + 'DD', PINK + 'CC'] as [string, string]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
+    <AndroidSafeView backgroundColor={PREMIUM_BG} style={styles.safe}>
+      <PremiumAtmosphereBackground />
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>My Progress</Text>
-          <Text style={styles.headerSub}>{name}'s fitness journey</Text>
+          <Text style={styles.headerSub}>{name}&apos;s fitness journey</Text>
         </View>
         {data && (
-          <TouchableOpacity onPress={handleExportPDF} disabled={exporting} style={[styles.recapBtn, { marginRight: spacing.sm }]}>
-            <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={16} color="#fff" />
-            <Text style={styles.recapBtnText}>PDF</Text>
+          <TouchableOpacity
+            onPress={handleExportPDF}
+            disabled={exporting}
+            style={[styles.headerActionBtn, { marginRight: spacing.xs }]}
+          >
+            <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={16} color={PREMIUM_TEXT} />
+            <Text style={styles.headerActionText}>PDF</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => navigation.navigate('Recap' as never)} style={styles.recapBtn}>
-          <Ionicons name="share-social-outline" size={16} color="#fff" />
-          <Text style={styles.recapBtnText}>Recap</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Recap')} style={styles.headerActionBtn}>
+          <Ionicons name="share-social-outline" size={16} color={PREMIUM_TEXT} />
+          <Text style={styles.headerActionText}>Recap</Text>
         </TouchableOpacity>
-      </LinearGradient>
-
-      <View style={[styles.periodTabs, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
-        {PERIODS.map((p) => (
-          <TouchableOpacity
-            key={p}
-            onPress={() => setPeriod(p)}
-            style={[styles.periodTab, period === p && { borderBottomColor: PURPLE }]}
-          >
-            <Text style={[styles.periodTabText, {
-              color: period === p ? PURPLE : theme.textMuted,
-              fontWeight: period === p ? '700' : '500',
-            }]}>{p}</Text>
-          </TouchableOpacity>
-        ))}
       </View>
+
+      <PremiumSegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
 
       <ScreenScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={PURPLE} colors={[PURPLE]} />}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={PREMIUM_ACCENT} colors={[PREMIUM_ACCENT]} />}
       >
+        {/* ── CALORIE CHART ── */}
+        {data?.chartDays && data.chartDays.length > 0 && (
+          <View style={[...glassCard, { marginTop: spacing.md }]}>
+            <View style={styles.cardTopRow}>
+              <GlassSectionTitle title="Calorie Trend" icon="flame-outline" color={ORANGE} />
+              <View style={styles.rangePill}>
+                <Text style={styles.rangePillText}>{PERIOD_RANGE_LABEL[period]}</Text>
+                <Ionicons name="chevron-down" size={14} color={PREMIUM_MUTED} />
+              </View>
+            </View>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: GREEN }]} />
+                <Text style={styles.legendText}>On target</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: BLUE }]} />
+                <Text style={styles.legendText}>Below goal</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#FF5959' }]} />
+                <Text style={styles.legendText}>Over goal</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: GOLD, height: 1, width: 12, borderRadius: 0 }]} />
+                <Text style={styles.legendText}>Goal line</Text>
+              </View>
+            </View>
+            <MiniBarChart data={data.chartDays} goal={data.calorieGoal} />
+          </View>
+        )}
+
+        {/* ── MOOD TRENDS ── */}
+        {user?.id && (
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onPress={() => navigation.navigate('Main', { screen: 'Home' })}
+            style={styles.moodWrap}
+          >
+            <MoodTrendChart userId={user.id} theme={premiumChartTheme} />
+            <View style={styles.moodChevron}>
+              <Ionicons name="chevron-forward" size={18} color={PREMIUM_MUTED} />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* ── ACTIVITY SUMMARY (mock 3-up) ── */}
+        {data && (
+          <View style={[...glassCard, { marginTop: spacing.lg }]}>
+            <View style={styles.cardTopRow}>
+              <GlassSectionTitle title="Activity Summary" icon="stats-chart-outline" color={BLUE} />
+              <Text style={styles.rangePillText}>{PERIOD_RANGE_LABEL[period]}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <SummaryMetric icon="flame-outline" label="Avg Calories" value={avgCalories.toLocaleString()} color={ORANGE} />
+              <View style={styles.summaryDiv} />
+              <SummaryMetric icon="footsteps-outline" label="Avg Steps" value={avgSteps.toLocaleString()} color={GREEN} />
+              <View style={styles.summaryDiv} />
+              <SummaryMetric icon="time-outline" label="Avg Active" value={`${avgActiveMin} min`} color={BLUE} />
+            </View>
+          </View>
+        )}
+
         {/* ── WEIGHT CARD ── */}
         {data?.weight && (
           <>
-            <SectionHeader title="Weight" icon="body-outline" color={PINK} theme={theme} />
-            <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+            <View style={{ marginTop: spacing.lg, marginHorizontal: spacing.lg }}>
+              <GlassSectionTitle title="Weight" icon="body-outline" color={PINK} />
+            </View>
+            <View style={glassCard}>
               <View style={styles.weightRow}>
                 <View>
-                  <Text style={[styles.weightVal, { color: theme.textPrimary }]}>{data.weight} kg</Text>
-                  <Text style={[styles.weightSub, { color: theme.textMuted }]}>Current weight</Text>
+                  <Text style={styles.weightVal}>{data.weight} kg</Text>
+                  <Text style={styles.weightSub}>Current weight</Text>
                 </View>
                 {data.targetWeight && (
                   <View style={styles.weightTarget}>
                     <Text style={[styles.weightTargetVal, { color: GREEN }]}>{data.targetWeight} kg</Text>
-                    <Text style={[styles.weightSub, { color: theme.textMuted }]}>Target</Text>
+                    <Text style={styles.weightSub}>Target</Text>
                   </View>
                 )}
                 <View style={[styles.bmiChip, { backgroundColor: PINK + '18' }]}>
@@ -306,7 +392,7 @@ export default function ProgressScreen() {
                   <View style={styles.progressBar}>
                     <View style={[styles.progressFill, { width: `${Math.round(weightProgress * 100)}%`, backgroundColor: PINK }]} />
                   </View>
-                  <Text style={[styles.progressLabel, { color: theme.textMuted }]}>
+                  <Text style={styles.progressLabel}>
                     {Math.abs(data.weight - data.targetWeight).toFixed(1)} kg to goal
                   </Text>
                 </View>
@@ -315,94 +401,24 @@ export default function ProgressScreen() {
           </>
         )}
 
-        {/* ── CALORIE CHART ── */}
-        {data?.chartDays && data.chartDays.length > 0 && (
-          <>
-            <SectionHeader title="Calorie Trend" icon="flame-outline" color={ORANGE} theme={theme} />
-            <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
-              <View style={styles.chartLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: GREEN }]} />
-                  <Text style={[styles.legendText, { color: theme.textMuted }]}>On target</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: BLUE }]} />
-                  <Text style={[styles.legendText, { color: theme.textMuted }]}>Below goal</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#FF5959' }]} />
-                  <Text style={[styles.legendText, { color: theme.textMuted }]}>Over goal</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: GOLD, height: 1, width: 12, borderRadius: 0 }]} />
-                  <Text style={[styles.legendText, { color: theme.textMuted }]}>Goal line</Text>
-                </View>
-              </View>
-              <MiniBarChart data={data.chartDays} goal={data.calorieGoal} theme={theme} />
-            </View>
-          </>
-        )}
-
-        {/* ── MOOD TRENDS ── */}
-        {user?.id && (
-          <View style={{ marginHorizontal: spacing.lg, marginTop: spacing.lg }}>
-            <MoodTrendChart userId={user.id} theme={theme} />
-          </View>
-        )}
-
-        {/* ── STATS GRID ── */}
-        {data && (
-          <>
-            <SectionHeader title="Activity Summary" icon="stats-chart-outline" color={BLUE} theme={theme} />
-            <View style={styles.statsGrid}>
-              <StatCard icon="restaurant-outline" label="Calories In"
-                value={data.totalCal.toLocaleString()}
-                sub={`/ ${data.calorieGoal.toLocaleString()} goal`}
-                color={ORANGE} theme={theme} />
-              <StatCard icon="flame-outline"      label="Calories Out"
-                value={data.totalBurned > 0 ? data.totalBurned.toLocaleString() : '—'}
-                sub={data.workoutsDone > 0 ? `${data.workoutsDone} session${data.workoutsDone !== 1 ? 's' : ''}` : 'no sessions yet'}
-                color={PINK} theme={theme} />
-              <StatCard icon="water-outline"      label="Water Total"
-                value={`${(data.totalWater/1000).toFixed(1)}L`}
-                sub={`/ ${(data.waterGoal/1000).toFixed(1)}L goal`}
-                color={BLUE} theme={theme} />
-              <StatCard icon="footsteps-outline"  label="Total Steps"
-                value={(() => {
-                  // Prefer DB total; fall back to today's live steps if DB is empty
-                  const s = data.totalSteps > 0 ? data.totalSteps : liveSteps;
-                  return s > 0 ? (s >= 1000 ? (s / 1000).toFixed(1) + 'k' : s.toString()) : '—';
-                })()}
-                sub="steps tracked"
-                color={GREEN} theme={theme} />
-              <StatCard icon="moon-outline"       label="Avg Sleep"
-                value={data.avgSleep > 0 ? `${data.avgSleep.toFixed(1)}h` : '—'}
-                sub="per night"
-                color={PURPLE} theme={theme} />
-              <StatCard icon="bonfire-outline"    label="Streak"
-                value={streakCount > 0 ? `${streakCount}d` : '—'}
-                sub="current streak"
-                color={GOLD} theme={theme} />
-            </View>
-          </>
-        )}
-
         {/* ── RECENT WORKOUTS ── */}
         {data?.recentWorkouts && data.recentWorkouts.length > 0 && (
           <>
-            <SectionHeader
-              title="Recent Workouts" icon="barbell-outline" color={PINK} theme={theme}
-              onPress={() => navigation.navigate('Main' as never, { screen: 'Activity' } as never)}
-            />
-            <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Main', { screen: 'Activity' })}
+              style={{ marginTop: spacing.lg, marginHorizontal: spacing.lg }}
+            >
+              <GlassSectionTitle title="Recent Workouts" icon="barbell-outline" color={PINK} />
+            </TouchableOpacity>
+            <View style={[...glassCard, { marginTop: spacing.sm }]}>
               {data.recentWorkouts.map((w: any, i: number) => (
-                <View key={i} style={[styles.workoutRow, i < data.recentWorkouts.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
+                <View key={i} style={[styles.workoutRow, i < data.recentWorkouts.length - 1 && styles.workoutRowBorder]}>
                   <View style={[styles.workoutIcon, { backgroundColor: PINK + '18' }]}>
                     <Ionicons name="barbell-outline" size={14} color={PINK} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.workoutName, { color: theme.textPrimary }]}>{w.name}</Text>
-                    <Text style={[styles.workoutMeta, { color: theme.textMuted }]}>
+                    <Text style={styles.workoutName}>{w.name}</Text>
+                    <Text style={styles.workoutMeta}>
                       {w.completed_at?.split('T')[0]} · {w.exercise_count} exercise{w.exercise_count !== 1 ? 's' : ''} · {Math.round((w.duration_seconds ?? 0) / 60)} min
                     </Text>
                   </View>
@@ -414,30 +430,31 @@ export default function ProgressScreen() {
         )}
 
         {/* ── BODY MEASUREMENTS ── */}
-        <SectionHeader
-          title="Body Measurements" icon="body-outline" color={PURPLE} theme={theme}
-          onPress={() => navigation.navigate('BodyMeasurements' as never)}
-          actionLabel="Log"
-        />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('BodyMeasurements')}
+          style={{ marginTop: spacing.lg, marginHorizontal: spacing.lg }}
+        >
+          <GlassSectionTitle title="Body Measurements" icon="body-outline" color={PURPLE} />
+        </TouchableOpacity>
         {data?.latestMeasurement ? (
-          <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
-            <Text style={[styles.measDate, { color: theme.textMuted }]}>
+          <View style={[...glassCard, { marginTop: spacing.sm }]}>
+            <Text style={styles.measDate}>
               Last logged: {data.latestMeasurement.measured_at?.split('T')[0]}
             </Text>
             <View style={styles.measGrid}>
               {[
-                { label: 'Chest',   value: data.latestMeasurement.chest_cm,   unit: 'cm', prev: data.prevMeasurement?.chest_cm },
-                { label: 'Waist',   value: data.latestMeasurement.waist_cm,   unit: 'cm', prev: data.prevMeasurement?.waist_cm },
-                { label: 'Hips',    value: data.latestMeasurement.hips_cm,    unit: 'cm', prev: data.prevMeasurement?.hips_cm },
-                { label: 'Arms',    value: data.latestMeasurement.arms_cm,    unit: 'cm', prev: data.prevMeasurement?.arms_cm },
-                { label: 'Thighs',  value: data.latestMeasurement.thighs_cm,  unit: 'cm', prev: data.prevMeasurement?.thighs_cm },
-                { label: 'Neck',    value: data.latestMeasurement.neck_cm,    unit: 'cm', prev: data.prevMeasurement?.neck_cm },
+                { label: 'Chest', value: data.latestMeasurement.chest_cm, unit: 'cm', prev: data.prevMeasurement?.chest_cm },
+                { label: 'Waist', value: data.latestMeasurement.waist_cm, unit: 'cm', prev: data.prevMeasurement?.waist_cm },
+                { label: 'Hips', value: data.latestMeasurement.hips_cm, unit: 'cm', prev: data.prevMeasurement?.hips_cm },
+                { label: 'Arms', value: data.latestMeasurement.arms_cm, unit: 'cm', prev: data.prevMeasurement?.arms_cm },
+                { label: 'Thighs', value: data.latestMeasurement.thighs_cm, unit: 'cm', prev: data.prevMeasurement?.thighs_cm },
+                { label: 'Neck', value: data.latestMeasurement.neck_cm, unit: 'cm', prev: data.prevMeasurement?.neck_cm },
               ].filter(m => m.value != null).map((m) => {
                 const diff = m.prev != null ? m.value - m.prev : null;
                 return (
-                  <View key={m.label} style={[styles.measItem, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-                    <Text style={[styles.measLabel, { color: theme.textMuted }]}>{m.label}</Text>
-                    <Text style={[styles.measValue, { color: theme.textPrimary }]}>{m.value}{m.unit}</Text>
+                  <View key={m.label} style={styles.measItem}>
+                    <Text style={styles.measLabel}>{m.label}</Text>
+                    <Text style={styles.measValue}>{m.value}{m.unit}</Text>
                     {diff !== null && diff !== 0 && (
                       <Text style={[styles.measDiff, { color: diff < 0 ? GREEN : '#FF5959' }]}>
                         {diff > 0 ? '+' : ''}{diff.toFixed(1)}cm
@@ -450,61 +467,97 @@ export default function ProgressScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            onPress={() => navigation.navigate('BodyMeasurements' as never)}
-            style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}
+            onPress={() => navigation.navigate('BodyMeasurements')}
+            style={[...glassCard, styles.emptyCard, { marginTop: spacing.sm }]}
           >
-            <Ionicons name="body-outline" size={28} color={theme.textMuted} />
-            <Text style={[styles.emptyCardText, { color: theme.textMuted }]}>
+            <Ionicons name="body-outline" size={28} color={PREMIUM_MUTED} />
+            <Text style={styles.emptyCardText}>
               Tap to log your first body measurements
             </Text>
           </TouchableOpacity>
         )}
-
-        <View style={{ height: 80 }} />
       </ScreenScrollView>
     </AndroidSafeView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1 },
-  scroll:   { paddingBottom: 40 },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
-
-  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
-  headerSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
-  recapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.18)' },
-  recapBtnText: { color: '#fff', fontSize: fontSize.xs, fontWeight: '700' },
-  periodTabs: { flexDirection: 'row', borderBottomWidth: 1 },
-  periodTab:  { flex: 1, alignItems: 'center', paddingVertical: spacing.sm + 2, borderBottomWidth: 2.5, borderBottomColor: 'transparent', marginBottom: -1 },
-  periodTabText: { fontSize: fontSize.xs },
-  card:       { borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg },
-  statsGrid:  { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: spacing.lg, gap: spacing.sm },
-  weightRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  weightVal:  { fontSize: 28, fontWeight: '900' },
-  weightSub:  { fontSize: fontSize.xs, marginTop: 2 },
-  weightTarget:{ alignItems: 'center' },
+  safe: { flex: 1 },
+  scroll: { paddingBottom: 40 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    zIndex: 10,
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: PREMIUM_TEXT, letterSpacing: -0.3 },
+  headerSub: { fontSize: fontSize.sm, color: PREMIUM_MUTED, marginTop: 2 },
+  headerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER,
+    backgroundColor: PREMIUM_GLASS,
+  },
+  headerActionText: { color: PREMIUM_TEXT, fontSize: fontSize.xs, fontWeight: '700' },
+  card: { borderRadius: radius.lg + 2, borderWidth: 1, padding: spacing.lg },
+  cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  rangePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  rangePillText: { fontSize: fontSize.xs, fontWeight: '600', color: PREMIUM_MUTED },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
+  summaryDiv: { width: 1, height: 48, backgroundColor: PREMIUM_GLASS_BORDER },
+  moodWrap: { marginHorizontal: spacing.lg, marginTop: spacing.lg, position: 'relative' },
+  moodChevron: { position: 'absolute', right: spacing.md, top: spacing.lg + 4 },
+  weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  weightVal: { fontSize: 28, fontWeight: '900', color: PREMIUM_TEXT },
+  weightSub: { fontSize: fontSize.xs, marginTop: 2, color: PREMIUM_MUTED },
+  weightTarget: { alignItems: 'center' },
   weightTargetVal: { fontSize: fontSize.lg, fontWeight: '800' },
-  bmiChip:    { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.md },
-  bmiText:    { fontSize: fontSize.sm, fontWeight: '700' },
+  bmiChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.md },
+  bmiText: { fontSize: fontSize.sm, fontWeight: '700' },
   progressBar: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,107,157,0.15)', overflow: 'hidden' },
-  progressFill:{ height: '100%', borderRadius: 4 },
-  progressLabel: { fontSize: fontSize.xs, marginTop: 4 },
-  chartLegend: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginBottom: spacing.sm },
-  legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot:   { width: 8, height: 8, borderRadius: 4 },
-  legendText:  { fontSize: 10 },
-  workoutRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  progressFill: { height: '100%', borderRadius: 4 },
+  progressLabel: { fontSize: fontSize.xs, marginTop: 4, color: PREMIUM_MUTED },
+  chartLegend: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginBottom: spacing.sm, marginTop: spacing.xs },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 10, color: PREMIUM_MUTED },
+  workoutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  workoutRowBorder: { borderBottomWidth: 1, borderBottomColor: PREMIUM_GLASS_BORDER },
   workoutIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  workoutName: { fontSize: fontSize.sm, fontWeight: '600' },
-  workoutMeta: { fontSize: fontSize.xs, marginTop: 1 },
-  workoutCal:  { fontSize: fontSize.sm, fontWeight: '700' },
-  measDate:    { fontSize: fontSize.xs, marginBottom: spacing.md },
-  measGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  measItem:    { padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', minWidth: 80 },
-  measLabel:   { fontSize: 10, fontWeight: '600' },
-  measValue:   { fontSize: fontSize.base, fontWeight: '800', marginTop: 2 },
-  measDiff:    { fontSize: 10, fontWeight: '700', marginTop: 1 },
-  emptyCard:   { padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: spacing.md, borderStyle: 'dashed' },
-  emptyCardText: { fontSize: fontSize.sm, textAlign: 'center' },
+  workoutName: { fontSize: fontSize.sm, fontWeight: '700', color: PREMIUM_TEXT },
+  workoutMeta: { fontSize: fontSize.xs, marginTop: 1, color: PREMIUM_MUTED },
+  workoutCal: { fontSize: fontSize.sm, fontWeight: '700' },
+  measDate: { fontSize: fontSize.xs, marginBottom: spacing.md, color: PREMIUM_MUTED },
+  measGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  measItem: {
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  measLabel: { fontSize: 10, fontWeight: '600', color: PREMIUM_MUTED },
+  measValue: { fontSize: fontSize.base, fontWeight: '800', marginTop: 2, color: PREMIUM_TEXT },
+  measDiff: { fontSize: 10, fontWeight: '700', marginTop: 1 },
+  emptyCard: { alignItems: 'center', gap: spacing.md, borderStyle: 'dashed' },
+  emptyCardText: { fontSize: fontSize.sm, textAlign: 'center', color: PREMIUM_MUTED },
 });

@@ -9,10 +9,19 @@ import Svg from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
-import { colors, spacing, radius, fontSize } from '../../theme';
+import { spacing, radius, fontSize } from '../../theme';
 import { getExerciseIllustration } from '../../components/ExerciseIllustrations';
+import { PremiumAtmosphereBackground } from '../../components/premium/PremiumAtmosphereBackground';
+import {
+  PREMIUM_BG,
+  PREMIUM_TEXT,
+  PREMIUM_MUTED,
+  PREMIUM_ACCENT,
+  PREMIUM_GLASS,
+  PREMIUM_GLASS_BORDER,
+  premiumGlassShadow,
+} from '../../components/premium/premiumEffects';
 import { ALL_CATEGORIES, CATEGORY_MAP, getCategoryTotalExercises } from '../../data/exerciseLibrary';
 import type { ExerciseCategory } from '../../data/exerciseLibrary';
 
@@ -42,11 +51,11 @@ const WORKOUT_CATEGORIES: { key: ExerciseCategory; icon: string; color: string; 
   return { key: cat, icon: meta.icon, color: meta.color, label: meta.label, exercises: categoryExercises[cat] };
 });
 
+const PURPLE = '#B280FF';
+
 export default function WorkoutScreen() {
   const navigation = useNavigation<any>();
-  const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
-  const theme = colors[colorScheme];
   const [routines, setRoutines] = useState<SavedRoutine[]>([]);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,36 +118,37 @@ export default function WorkoutScreen() {
   };
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={{ flex: 1 }}>
+    <AndroidSafeView backgroundColor={PREMIUM_BG} style={{ flex: 1 }}>
+      <PremiumAtmosphereBackground />
       {loadingData ? (
-        <View style={[styles.loadingInit, { backgroundColor: theme.bg }]}>
-          <View style={[styles.loadingInitCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.loadingInit, { backgroundColor: 'transparent' }]}>
+          <View style={[styles.loadingInitCard, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
             <LinearGradient colors={['#2DDC8C', '#0A9A5E'] as [string, string]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.loadingInitIcon}>
               <Ionicons name="barbell-outline" size={32} color="#fff" />
             </LinearGradient>
-            <Text style={[styles.loadingInitText, { color: theme.textPrimary }]}>Loading your workouts...</Text>
+            <Text style={[styles.loadingInitText, { color: PREMIUM_TEXT }]}>Loading your workouts...</Text>
           </View>
         </View>
       ) : (
       <ScreenScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PREMIUM_ACCENT} />}
       >
         <View style={[styles.header, { paddingTop: spacing.md }]}>
           <View>
-            <Text style={[styles.greeting, { color: theme.textMuted }]}>Ready to work out?</Text>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Let's crush it 💪</Text>
+            <Text style={[styles.greeting, { color: PREMIUM_MUTED }]}>Ready to work out?</Text>
+            <Text style={[styles.title, { color: PREMIUM_TEXT }]}>Let's crush it 💪</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={[styles.profileBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="person-outline" size={20} color={theme.textPrimary} />
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={[styles.profileBtn, { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
+            <Ionicons name="person-outline" size={20} color={PREMIUM_TEXT} />
           </TouchableOpacity>
         </View>
 
         {/* Hero stat card */}
-        <LinearGradient colors={[theme.heroCard, '#1a1a2e'] as [string, string]} style={styles.heroCard}>
+        <View style={[styles.heroCard, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER, borderWidth: 1 }]}>
           <View style={styles.heroTop}>
             <View style={styles.heroStat}>
               <Ionicons name="flame" size={18} color="#FF6B35" />
@@ -163,17 +173,17 @@ export default function WorkoutScreen() {
               style={[styles.heroProgressFill, { width: `${Math.min((totalCalories / 500) * 100, 100)}%` as any }]} />
           </View>
           <Text style={styles.heroProgressLabel}>{Math.min(Math.round((totalCalories / 500) * 100), 100)}% of daily goal</Text>
-        </LinearGradient>
+        </View>
 
         {/* Quick actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity onPress={() => navigation.navigate('QuickStart', { category: 'Full Body' })} activeOpacity={0.85}
-            style={[styles.quickBtn, { backgroundColor: theme.accent }]}>
+            style={[styles.quickBtn, styles.quickBtnPrimary, { backgroundColor: PREMIUM_ACCENT }]}>
             <Ionicons name="play-circle" size={22} color="#fff" />
             <Text style={styles.quickBtnText}>Start Workout</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('AICoach')} activeOpacity={0.85}
-            style={[styles.quickBtn, { backgroundColor: theme.purple }]}>
+            style={[styles.quickBtn, { backgroundColor: PURPLE }]}>
             <Ionicons name="bulb" size={22} color="#fff" />
             <Text style={styles.quickBtnText}>AI Coach</Text>
           </TouchableOpacity>
@@ -181,32 +191,32 @@ export default function WorkoutScreen() {
 
         {/* AI Analysis CTA */}
         <TouchableOpacity onPress={() => navigation.navigate('Analysis')} activeOpacity={0.85}
-          style={[styles.analysisCta, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          style={[styles.analysisCta, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
           <LinearGradient colors={['#FFB830', '#FF8C42'] as [string, string]} style={styles.analysisCtaGrad}>
             <Ionicons name="bulb" size={20} color="#fff" />
           </LinearGradient>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.analysisCtaTitle, { color: theme.textPrimary }]}>AI Workout Analysis</Text>
-            <Text style={[styles.analysisCtaSub, { color: theme.textMuted }]}>See your progress, trends & predictions</Text>
+            <Text style={[styles.analysisCtaTitle, { color: PREMIUM_TEXT }]}>AI Workout Analysis</Text>
+            <Text style={[styles.analysisCtaSub, { color: PREMIUM_MUTED }]}>See your progress, trends & predictions</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+          <Ionicons name="chevron-forward" size={18} color={PREMIUM_MUTED} />
         </TouchableOpacity>
 
         {/* Categories */}
-        <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Workout Categories</Text>
+        <Text style={[styles.sectionTitle, { color: PREMIUM_TEXT }]}>Workout Categories</Text>
         <View style={styles.categoryGrid}>
           {WORKOUT_CATEGORIES.map(cat => {
             const IllusComp = getExerciseIllustration(cat.key);
             return (
               <TouchableOpacity key={cat.key} onPress={() => navigation.navigate('QuickStart', { category: cat.key })} activeOpacity={0.85}
-                style={[styles.catCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                style={[styles.catCard, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
                 <View style={[styles.catIllusWrap, { backgroundColor: cat.color + '15' }]}>
                   <Svg width={52} height={52} viewBox="0 0 100 100">
                     <IllusComp color={cat.color} />
                   </Svg>
                 </View>
-                <Text style={[styles.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
-                <Text style={[styles.catCount, { color: theme.textMuted }]}>{cat.exercises} ex</Text>
+                <Text style={[styles.catLabel, { color: PREMIUM_TEXT }]}>{cat.label}</Text>
+                <Text style={[styles.catCount, { color: PREMIUM_MUTED }]}>{cat.exercises} ex</Text>
               </TouchableOpacity>
             );
           })}
@@ -214,29 +224,29 @@ export default function WorkoutScreen() {
 
         {/* My Routines */}
         <View style={styles.sectionRow}>
-          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>My Routines</Text>
+          <Text style={[styles.sectionTitle, { color: PREMIUM_TEXT }]}>My Routines</Text>
           <TouchableOpacity onPress={() => navigation.navigate('QuickStart', { category: 'Full Body' })}>
-            <Text style={[styles.seeAll, { color: theme.accent }]}>+ New</Text>
+            <Text style={[styles.seeAll, { color: PREMIUM_ACCENT }]}>+ New</Text>
           </TouchableOpacity>
         </View>
         {routines.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Ionicons name="barbell-outline" size={32} color={theme.textMuted} />
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No routines yet</Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>Tap "Start Workout" to build one</Text>
+          <View style={[styles.emptyCard, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
+            <Ionicons name="barbell-outline" size={32} color={PREMIUM_MUTED} />
+            <Text style={[styles.emptyText, { color: PREMIUM_TEXT }]}>No routines yet</Text>
+            <Text style={[styles.emptySub, { color: PREMIUM_MUTED }]}>Tap "Start Workout" to build one</Text>
           </View>
         ) : (
           <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={styles.routineScroll}>
             {routines.slice(0, 5).map(r => {
               const firstCat = r.exercises[0]?.category || 'Full Body';
-              const cardColor = CAT_COLORS[firstCat] || theme.accent;
+              const cardColor = CAT_COLORS[firstCat] || PREMIUM_ACCENT;
               return (
                 <TouchableOpacity key={r.id} onPress={() => navigation.navigate('QuickStart')} activeOpacity={0.85}
-                  style={[styles.routineCard, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: cardColor }]}>
-                  <Text style={[styles.routineName, { color: theme.textPrimary }]} numberOfLines={1}>{r.name}</Text>
+                  style={[styles.routineCard, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER, borderLeftColor: cardColor }]}>
+                  <Text style={[styles.routineName, { color: PREMIUM_TEXT }]} numberOfLines={1}>{r.name}</Text>
                   <View style={styles.routineMeta}>
-                    <Text style={[styles.routineMetaText, { color: theme.textMuted }]}>{r.exercises.length} exercises</Text>
-                    {r.duration_est && <Text style={[styles.routineMetaText, { color: theme.textMuted }]}>~{r.duration_est} min</Text>}
+                    <Text style={[styles.routineMetaText, { color: PREMIUM_MUTED }]}>{r.exercises.length} exercises</Text>
+                    {r.duration_est && <Text style={[styles.routineMetaText, { color: PREMIUM_MUTED }]}>~{r.duration_est} min</Text>}
                   </View>
                 </TouchableOpacity>
               );
@@ -247,25 +257,25 @@ export default function WorkoutScreen() {
         {/* Recent sessions */}
         {sessions.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Recent Workouts</Text>
+            <Text style={[styles.sectionTitle, { color: PREMIUM_TEXT }]}>Recent Workouts</Text>
             {sessions.slice(0, 3).map(s => {
               const date = new Date(s.completed_at);
               const hrs = Math.floor(s.duration_seconds / 3600);
               const mins = Math.floor((s.duration_seconds % 3600) / 60);
               return (
-                <View key={s.id} style={[styles.sessionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                  <LinearGradient colors={[theme.heroCard + 'CC', theme.heroCard + '66'] as [string, string]} style={styles.sessionTop}>
+                <View key={s.id} style={[styles.sessionCard, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
+                  <LinearGradient colors={['rgba(45,220,140,0.35)', 'rgba(45,220,140,0.08)'] as [string, string]} style={styles.sessionTop}>
                     <Text style={styles.sessionName}>{s.name}</Text>
                     <View style={styles.sessionCal}>
                       <Text style={[styles.sessionCalVal, { color: '#FF6B35' }]}>{s.calories_burned}</Text>
                       <Text style={[styles.sessionCalUnit, { color: '#FF6B35' }]}>kcal</Text>
                     </View>
                   </LinearGradient>
-                  <View style={[styles.sessionBottom, { backgroundColor: theme.card }]}>
-                    <Text style={[styles.sessionDate, { color: theme.textMuted }]}>
+                  <View style={[styles.sessionBottom, { backgroundColor: 'transparent' }]}>
+                    <Text style={[styles.sessionDate, { color: PREMIUM_MUTED }]}>
                       {date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </Text>
-                    <Text style={[styles.sessionTime, { color: theme.textMuted }]}>{hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`}</Text>
+                    <Text style={[styles.sessionTime, { color: PREMIUM_MUTED }]}>{hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`}</Text>
                   </View>
                 </View>
               );
@@ -292,7 +302,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 },
   profileBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 
-  heroCard: { marginHorizontal: spacing.lg, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14 }, android: { elevation: 8 }, web: { boxShadow: '0 6px 14px rgba(0,0,0,0.25)' } }) },
+  heroCard: { marginHorizontal: spacing.lg, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md },
+  quickBtnPrimary: { flex: 1.35 },
   heroTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   heroStat: { flex: 1, alignItems: 'center', gap: 2 },
   heroDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.15)' },

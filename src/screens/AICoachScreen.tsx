@@ -8,32 +8,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { colors, spacing, radius, fontSize } from '../theme';
-import { useThemeStore } from '../store/themeStore';
+import { spacing, radius, fontSize } from '../theme';
+import { caloriePremiumTheme } from '../components/calorie/PremiumCalorieUI';
 import { useAuthStore } from '../store/authStore';
 import { useAiCoachStore } from '../store/aiCoachStore';
-import { WorkoutForm } from '../components/WorkoutForm';
+import { PremiumWorkoutWizard } from '../components/ai-coach/PremiumWorkoutWizard';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { AILoadingSkeleton } from '../components/AILoadingSkeleton';
 import { SavedWorkoutsList } from '../components/SavedWorkoutsList';
 import { FitnessProfileModal } from '../components/FitnessProfileModal';
 import { ChatBubble } from '../components/ChatBubble';
 import { VoiceMicButton } from '../components/VoicemicButton';
-import type { FitnessLevel, FitnessGoal, Equipment, GeneratedWorkout } from '../types/ai-coach.types';
+import { PremiumAtmosphereBackground } from '../components/premium/PremiumAtmosphereBackground';
 import {
-  PastelScreenBackground,
-  SegmentChips,
-  isWellnessLight,
-  glassSurface,
-  WELLNESS_GREEN,
-} from '../components/wellness';
+  PREMIUM_BG,
+  PREMIUM_TEXT,
+  PREMIUM_MUTED,
+  PREMIUM_ACCENT,
+  PREMIUM_GLASS,
+  PREMIUM_GLASS_BORDER,
+  premiumGlassShadow,
+} from '../components/premium/premiumEffects';
+import type { FitnessLevel, FitnessGoal, Equipment, GeneratedWorkout } from '../types/ai-coach.types';
 
 type Tab = 'generate' | 'saved' | 'chat';
 
-const QUICK_TOPICS: { label: string; prompt: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { label: 'Workout', prompt: 'Suggest a balanced workout for today based on my goals.', icon: 'barbell-outline' },
-  { label: 'Meal', prompt: 'Help me plan high-protein meals for the rest of today.', icon: 'restaurant-outline' },
-  { label: 'Tips', prompt: 'Give me 3 practical tips to stay consistent this week.', icon: 'bulb-outline' },
+const QUICK_TOPICS: {
+  label: string;
+  prompt: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  action?: 'generate' | 'mealPlan';
+}[] = [
+  { label: 'Workout Plan', prompt: 'Suggest a balanced workout for today based on my goals.', icon: 'barbell-outline', color: PREMIUM_ACCENT, action: 'generate' },
+  { label: 'Meal Plan', prompt: 'Help me plan high-protein meals for the rest of today.', icon: 'restaurant-outline', color: '#FFB347', action: 'mealPlan' },
+  { label: 'Fitness Tips', prompt: 'Give me 3 practical tips to stay consistent this week.', icon: 'bulb-outline', color: '#B280FF' },
 ];
 
 const FOLLOW_UP_PROMPTS = [
@@ -50,9 +59,7 @@ const TAB_ICONS: Record<Tab, keyof typeof Ionicons.glyphMap> = {
 export default function AICoachScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useThemeStore();
-  const theme = colors[colorScheme];
-  const wellness = isWellnessLight(colorScheme);
+  const theme = caloriePremiumTheme;
   const { user } = useAuthStore();
   const store = useAiCoachStore();
   const [activeTab, setActiveTab] = useState<Tab>('chat');
@@ -62,9 +69,9 @@ export default function AICoachScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>('beginner');
-  const [goals, setGoals] = useState<FitnessGoal[]>([]);
+  const [goals, setGoals] = useState<FitnessGoal[]>(['weight_loss']);
   const [duration, setDuration] = useState(30);
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>(['body-weight']);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', e => setKeyboardHeight(e.endCoordinates.height));
@@ -89,6 +96,10 @@ export default function AICoachScreen() {
     setEquipment((prev) => prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]);
   };
 
+  const setPrimaryGoal = (g: FitnessGoal) => setGoals([g]);
+
+  const setEquipmentSingle = (e: Equipment) => setEquipment([e]);
+
   const handleGenerate = async () => {
     if (!user) return;
     if (!fitnessLevel || goals.length === 0 || !duration || equipment.length === 0) {
@@ -104,11 +115,8 @@ export default function AICoachScreen() {
   };
 
   const handleSelectSaved = (workout: GeneratedWorkout) => {
+    useAiCoachStore.setState({ currentWorkout: workout });
     setActiveTab('generate');
-    store.updateUserProfile({
-      fitness_level: fitnessLevel, goals,
-      preferred_equipment: equipment, preferred_duration: duration,
-    });
   };
 
   const handleSendChat = async (text?: string) => {
@@ -129,27 +137,33 @@ export default function AICoachScreen() {
     setTimeout(() => handleSendChat(text), 100);
   };
 
-  const accent = wellness ? WELLNESS_GREEN : theme.accent;
   const showBack = navigation.canGoBack();
+
+  const onQuickTopic = (topic: (typeof QUICK_TOPICS)[number]) => {
+    if (topic.action === 'generate') {
+      setActiveTab('generate');
+      return;
+    }
+    if (topic.action === 'mealPlan') {
+      navigation.navigate('MealPlan');
+      return;
+    }
+    handleSuggestionTap(topic.prompt);
+  };
 
   const renderQuickTopics = (compact?: boolean) => (
     <View style={[styles.quickTopicRow, compact && styles.quickTopicRowCompact]}>
       {QUICK_TOPICS.map((topic) => (
         <TouchableOpacity
           key={topic.label}
-          onPress={() => handleSuggestionTap(topic.prompt)}
+          onPress={() => onQuickTopic(topic)}
           activeOpacity={0.85}
-          style={[
-            styles.quickTopicChip,
-            wellness
-              ? [glassSurface('rgba(255,255,255,0.9)'), { borderColor: 'rgba(255,255,255,0.95)' }]
-              : { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
+          style={[styles.quickTopicChip, premiumGlassShadow(), { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}
         >
-          <View style={[styles.quickTopicIcon, { backgroundColor: accent + '18' }]}>
-            <Ionicons name={topic.icon} size={18} color={accent} />
+          <View style={[styles.quickTopicIcon, { backgroundColor: topic.color + '22' }]}>
+            <Ionicons name={topic.icon} size={20} color={topic.color} />
           </View>
-          <Text style={[styles.quickTopicText, { color: theme.textPrimary }]}>{topic.label}</Text>
+          <Text style={[styles.quickTopicText, { color: PREMIUM_TEXT }]}>{topic.label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -163,12 +177,15 @@ export default function AICoachScreen() {
       keyboardShouldPersistTaps="handled"
       nestedScrollEnabled
     >
-      <View style={[styles.chatEmptyIconWrap, { backgroundColor: accent + '15' }]}>
-        <Ionicons name="sparkles" size={36} color={accent} />
+      <View style={styles.coachHero}>
+        <Text style={styles.coachRobot}>🤖</Text>
+        <Text style={styles.coachFloat1}>🏋️</Text>
+        <Text style={styles.coachFloat2}>💬</Text>
+        <Text style={styles.coachFloat3}>❤️</Text>
       </View>
-      <Text style={[styles.chatEmptyTitle, { color: theme.textPrimary }]}>Hi! I&apos;m your coach</Text>
-      <Text style={[styles.chatEmptySub, { color: theme.textSecondary }]}>
-        Pick a topic below or type a question — workouts, meals, and habits.
+      <Text style={[styles.chatEmptyTitle, { color: PREMIUM_TEXT }]}>Hi! I&apos;m your AI Coach</Text>
+      <Text style={[styles.chatEmptySub, { color: PREMIUM_MUTED }]}>
+        Workouts, meal plans, and habits — pick a shortcut or message me below.
       </Text>
 
       {renderQuickTopics()}
@@ -180,14 +197,9 @@ export default function AICoachScreen() {
             key={s}
             onPress={() => handleSuggestionTap(s)}
             activeOpacity={0.85}
-            style={[
-              styles.followUpChip,
-              wellness
-                ? [glassSurface('rgba(255,255,255,0.85)'), { borderColor: 'rgba(255,255,255,0.9)' }]
-                : { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
+            style={[styles.followUpChip, { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}
           >
-            <Text style={[styles.followUpText, { color: theme.textSecondary }]} numberOfLines={2}>
+            <Text style={[styles.followUpText, { color: PREMIUM_MUTED }]} numberOfLines={2}>
               {s}
             </Text>
           </TouchableOpacity>
@@ -196,7 +208,7 @@ export default function AICoachScreen() {
     </ScrollView>
   );
 
-  function ThinkingBubble({ theme, startedAt }: { theme: typeof colors.light; startedAt: number | null }) {
+  function ThinkingBubble({ startedAt }: { startedAt: number | null }) {
     const [elapsed, setElapsed] = useState(0);
     const dotOpacity = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
 
@@ -228,7 +240,7 @@ export default function AICoachScreen() {
               <Animated.View key={i} style={[styles.thinkingDot, { opacity: dotOpacity[i] }]} />
             ))}
           </View>
-          <Text style={[styles.thinkingTimer, { color: theme.textMuted }]}>
+          <Text style={[styles.thinkingTimer, { color: PREMIUM_MUTED }]}>
             Thinking{'.'.repeat((elapsed % 3) + 1)} {elapsed}s
           </Text>
         </View>
@@ -267,7 +279,7 @@ export default function AICoachScreen() {
             keyExtractor={m => m.id}
             renderItem={({ item }) =>
               item.id === '__thinking__' ? (
-                <ThinkingBubble theme={theme} startedAt={store.chatStartedAt} />
+                <ThinkingBubble startedAt={store.chatStartedAt} />
               ) : (
                 <ChatBubble message={item.content} role={item.role} />
               )
@@ -293,21 +305,14 @@ export default function AICoachScreen() {
           },
         ]}
       >
-        <View
-          style={[
-            styles.chatInputWrap,
-            wellness
-              ? [glassSurface('rgba(255,255,255,0.94)'), { borderColor: 'rgba(255,255,255,0.95)' }]
-              : { backgroundColor: theme.bg, borderColor: theme.border },
-          ]}
-        >
+        <View style={[styles.chatInputWrap, { backgroundColor: PREMIUM_GLASS, borderColor: PREMIUM_GLASS_BORDER }]}>
           <VoiceMicButton theme={theme} onTranscribed={handleVoiceTranscribed} size={36} />
           <TextInput
             value={chatInput}
             onChangeText={setChatInput}
             placeholder="Message your coach…"
-            placeholderTextColor={theme.textMuted}
-            style={[styles.chatInput, { color: theme.textPrimary }]}
+            placeholderTextColor={PREMIUM_MUTED}
+            style={[styles.chatInput, { color: PREMIUM_TEXT }]}
             multiline
             maxLength={500}
             onSubmitEditing={() => handleSendChat()}
@@ -318,15 +323,9 @@ export default function AICoachScreen() {
             onPress={() => handleSendChat()}
             disabled={!chatInput.trim() || store.isChatLoading}
             activeOpacity={0.85}
-            style={[
-              styles.sendBtn,
-              {
-                backgroundColor: chatInput.trim() ? accent : theme.border,
-                opacity: chatInput.trim() ? 1 : 0.5,
-              },
-            ]}
+            style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? PREMIUM_ACCENT : PREMIUM_GLASS_BORDER, opacity: chatInput.trim() ? 1 : 0.5 }]}
           >
-            <Ionicons name="arrow-up" size={18} color="#fff" />
+            <Ionicons name="arrow-up" size={18} color={PREMIUM_BG} />
           </TouchableOpacity>
         </View>
       </View>
@@ -433,72 +432,76 @@ export default function AICoachScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <WorkoutForm
-          fitnessLevel={fitnessLevel} goals={goals} duration={duration} equipment={equipment}
-          onChangeLevel={setFitnessLevel} onToggleGoal={toggleGoal}
-          onChangeDuration={setDuration} onToggleEquipment={toggleEquipment}
-          onGenerate={handleGenerate} isLoading={store.isLoading}
+        <PremiumWorkoutWizard
+          fitnessLevel={fitnessLevel}
+          goals={goals}
+          duration={duration}
+          equipment={equipment}
+          onChangeLevel={setFitnessLevel}
+          onToggleGoal={toggleGoal}
+          onSetPrimaryGoal={setPrimaryGoal}
+          onChangeDuration={setDuration}
+          onToggleEquipment={toggleEquipment}
+          onSetEquipmentSingle={setEquipmentSingle}
+          onGenerate={handleGenerate}
+          isLoading={store.isLoading}
         />
       </ScrollView>
     );
   };
 
+  const renderTabBar = () => (
+    <View style={styles.tabBar}>
+      {(['generate', 'saved', 'chat'] as Tab[]).map(tab => {
+        const active = activeTab === tab;
+        const label = tab === 'generate' ? 'Generate' : tab === 'saved' ? 'Saved' : 'Chat';
+        return (
+          <TouchableOpacity
+            key={tab}
+            onPress={() => setActiveTab(tab)}
+            activeOpacity={0.88}
+            style={[styles.tabItem, active && styles.tabItemActive]}
+          >
+            <Ionicons name={TAB_ICONS[tab]} size={16} color={active ? PREMIUM_BG : PREMIUM_MUTED} style={{ marginRight: 4 }} />
+            <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const subtitle =
+    activeTab === 'chat'
+      ? 'Chat · workouts & nutrition'
+      : activeTab === 'saved'
+        ? 'Saved workouts'
+        : 'Let AI create a personalized plan';
+
   return (
-    <View style={[styles.root, { backgroundColor: wellness ? 'transparent' : theme.bg, paddingTop: insets.top }]}>
-      {wellness ? <PastelScreenBackground /> : null}
-      {/* Header */}
+    <View style={[styles.root, { backgroundColor: PREMIUM_BG, paddingTop: insets.top }]}>
+      <PremiumAtmosphereBackground />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {showBack ? (
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[
-                styles.backBtn,
-                wellness
-                  ? [glassSurface('rgba(255,255,255,0.8)'), { borderColor: 'rgba(255,255,255,0.9)' }]
-                  : { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={22} color={PREMIUM_TEXT} />
             </TouchableOpacity>
           ) : null}
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>AI Coach</Text>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]} numberOfLines={1}>
-              {activeTab === 'chat' ? 'Chat · workouts & nutrition' : activeTab === 'saved' ? 'Saved workouts' : 'Build a workout'}
-            </Text>
+            <Text style={styles.title}>AI Coach</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
-        <TouchableOpacity
-          onPress={() => setShowProfile(true)}
-          hitSlop={12}
-          style={[
-            styles.profileBtn,
-            wellness
-              ? [glassSurface('rgba(255,255,255,0.8)'), { borderColor: 'rgba(255,255,255,0.9)' }]
-              : { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="options-outline" size={20} color={theme.textPrimary} />
+        <TouchableOpacity onPress={() => setShowProfile(true)} hitSlop={12} style={styles.profileBtn}>
+          <Ionicons name="options-outline" size={20} color={PREMIUM_TEXT} />
         </TouchableOpacity>
       </View>
 
-      <SegmentChips
-        variant="segmented"
-        tabs={[
-          { id: 'generate' as Tab, label: 'Generate', icon: TAB_ICONS.generate, color: accent },
-          { id: 'saved' as Tab, label: 'Saved', icon: TAB_ICONS.saved, color: accent },
-          { id: 'chat' as Tab, label: 'Chat', icon: TAB_ICONS.chat, color: accent },
-        ]}
-        active={activeTab}
-        onChange={setActiveTab}
-        theme={theme}
-      />
+      {renderTabBar()}
 
       <View style={styles.content}>
         {activeTab === 'generate' && renderGenerateContent()}
-        {activeTab === 'saved' && <SavedWorkoutsList onSelectWorkout={handleSelectSaved} />}
+        {activeTab === 'saved' && <SavedWorkoutsList variant="premium" onSelectWorkout={handleSelectSaved} />}
         {activeTab === 'chat' && renderChat()}
       </View>
 
@@ -523,10 +526,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '800' },
-  subtitle: { fontSize: fontSize.sm, marginTop: 2 },
-  profileBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER, backgroundColor: PREMIUM_GLASS,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { fontSize: 24, fontWeight: '800', color: PREMIUM_TEXT },
+  subtitle: { fontSize: fontSize.sm, marginTop: 2, color: PREMIUM_MUTED },
+  profileBtn: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER, backgroundColor: PREMIUM_GLASS,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  tabBar: {
+    flexDirection: 'row', flexGrow: 0, flexShrink: 0,
+    marginHorizontal: spacing.lg, marginBottom: spacing.md,
+    borderRadius: radius.full, padding: 4, borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER, backgroundColor: PREMIUM_GLASS,
+  },
+  tabItem: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 10, borderRadius: radius.full,
+  },
+  tabItemActive: { backgroundColor: PREMIUM_ACCENT },
+  tabLabel: { fontSize: fontSize.sm, fontWeight: '700', color: PREMIUM_MUTED },
+  tabLabelActive: { color: PREMIUM_BG },
 
   content: { flex: 1, minHeight: 0, paddingBottom: 88 },
 
@@ -580,14 +605,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
   },
-  chatEmptyIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
+  coachHero: { position: 'relative', width: 120, height: 100, marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center' },
+  coachRobot: { fontSize: 64 },
+  coachFloat1: { position: 'absolute', top: 0, left: 0, fontSize: 22 },
+  coachFloat2: { position: 'absolute', top: 8, right: -4, fontSize: 20 },
+  coachFloat3: { position: 'absolute', bottom: 4, right: 8, fontSize: 18 },
   chatEmptyTitle: { fontSize: fontSize.xl + 2, fontWeight: '800', textAlign: 'center', marginBottom: spacing.xs },
   chatEmptySub: {
     fontSize: fontSize.sm,
@@ -643,6 +665,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xs,
     borderRadius: radius.lg,
+    borderWidth: 1,
     minWidth: 96,
     maxWidth: 120,
     flexShrink: 0,

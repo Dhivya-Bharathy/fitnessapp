@@ -1,158 +1,228 @@
 import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Switch, Alert, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { confirmDialog } from '../../utils/confirmDialog';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
-import { colors, spacing, radius, fontSize } from '../../theme';
+import { spacing, radius, fontSize } from '../../theme';
 import Avatar from '../../components/Avatar';
+import { PremiumAtmosphereBackground } from '../../components/premium/PremiumAtmosphereBackground';
+import {
+  PREMIUM_BG,
+  PREMIUM_TEXT,
+  PREMIUM_MUTED,
+  PREMIUM_ACCENT,
+  PREMIUM_GLASS,
+  PREMIUM_GLASS_BORDER,
+  premiumGlassShadow,
+} from '../../components/premium/premiumEffects';
 import {
   scheduleMealReminders,
   scheduleWaterReminder,
   scheduleWorkoutReminder,
   scheduleSleepReminder,
+  scheduleStreakReminder,
   cancelAllReminders,
   requestNotificationPermissions,
 } from '../../services/reminderService';
 
-
 const PREFS_KEY = 'calfit_notification_prefs';
 
 interface NotifPrefs {
-  pushEnabled:       boolean;
-  mealReminders:    boolean;
-  waterReminders:   boolean;
-  workoutReminders:  boolean;
-  sleepReminders:    boolean;
+  pushEnabled: boolean;
+  streakReminders: boolean;
+  mealReminders: boolean;
+  waterReminders: boolean;
+  workoutReminders: boolean;
+  sleepReminders: boolean;
 }
 
 const DEFAULT_PREFS: NotifPrefs = {
-  pushEnabled:      true,
-  mealReminders:    false,
-  waterReminders:   false,
+  pushEnabled: true,
+  streakReminders: true,
+  mealReminders: false,
+  waterReminders: true,
   workoutReminders: false,
-  sleepReminders:   false,
+  sleepReminders: false,
 };
 
 async function loadPrefs(): Promise<NotifPrefs> {
   try {
     const raw = await SecureStore.getItemAsync(PREFS_KEY);
     if (!raw) return DEFAULT_PREFS;
-    return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
-  } catch { return DEFAULT_PREFS; }
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_PREFS, ...parsed, streakReminders: parsed.streakReminders ?? DEFAULT_PREFS.streakReminders };
+  } catch {
+    return DEFAULT_PREFS;
+  }
 }
 
 async function savePrefs(prefs: NotifPrefs): Promise<void> {
-  try { await SecureStore.setItemAsync(PREFS_KEY, JSON.stringify(prefs)); } catch {}
+  try {
+    await SecureStore.setItemAsync(PREFS_KEY, JSON.stringify(prefs));
+  } catch {}
 }
 
-// ── SAFE COLORS ───────────────────────────────────────────────
 const ORANGE = '#FFB347';
-const GOLD   = '#FFD133';
+const GOLD = '#FFD133';
 const PURPLE = '#B280FF';
-const RED    = '#FF5959';
+const RED = '#FF5959';
+const BLUE = '#6699FF';
+type RowItem = {
+  label: string;
+  value?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
+  toggle?: boolean;
+  toggleValue?: boolean;
+  onToggle?: (val: boolean) => void;
+  onPress?: () => void;
+};
 
-
-// ── SETTINGS GROUP ────────────────────────────────────────────
-function SettingsGroup({ theme, title, items }: {
-  theme: typeof colors.dark;
+function SettingsSection({
+  icon,
+  iconColor,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
   title: string;
-  items: Array<{
-    label: string; value?: string; icon: string; iconColor?: string;
-    toggle?: boolean; toggleValue?: boolean;
-    onToggle?: (val: boolean) => void;
-    onPress?: () => void; danger?: boolean;
-  }>;
+  subtitle: string;
+  children: ReactNode;
 }) {
   return (
-    <View style={styles.group}>
-      <Text style={[styles.groupTitle, { color: theme.textMuted }]}>{title.toUpperCase()}</Text>
-      <View style={[styles.groupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        {items.map((item, i) => (
-          <TouchableOpacity
-            key={item.label}
-            onPress={item.onPress}
-            disabled={item.toggle && !item.onPress}
-            activeOpacity={item.toggle ? 1 : 0.7}
-            style={[
-              styles.settingsRow,
-              i < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
-            ]}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: (item.iconColor ?? theme.accent) + '18' }]}>
-              <Ionicons name={item.icon as any} size={17} color={item.iconColor ?? theme.accent} />
-            </View>
-            <View style={styles.settingsInfo}>
-              <Text style={[styles.settingsLabel, {
-                color: item.danger ? RED : theme.textPrimary,
-              }]}>{item.label}</Text>
-              {item.value && (
-                <Text style={[styles.settingsValue, { color: theme.textMuted }]} numberOfLines={1}>
-                  {item.value}
-                </Text>
-              )}
-            </View>
-            {item.toggle ? (
-              <Switch
-                value={item.toggleValue ?? false}
-                onValueChange={item.onToggle}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor="#fff"
-              />
-            ) : !item.danger ? (
-              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-            ) : null}
-          </TouchableOpacity>
-        ))}
+    <View style={styles.section}>
+      <View style={styles.sectionHead}>
+        <View style={[styles.sectionHeadIcon, { backgroundColor: iconColor + '20' }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
+        <View style={styles.sectionHeadText}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          <Text style={styles.sectionSub}>{subtitle}</Text>
+        </View>
       </View>
+      <View style={[styles.sectionCard, premiumGlassShadow()]}>{children}</View>
     </View>
   );
 }
 
-// ── MAIN SCREEN ───────────────────────────────────────────────
+function SettingsRow({ item, isLast }: { item: RowItem; isLast: boolean }) {
+  return (
+    <TouchableOpacity
+      onPress={item.onPress}
+      disabled={item.toggle && !item.onPress}
+      activeOpacity={item.toggle ? 1 : 0.75}
+      style={[styles.settingsRow, !isLast && styles.settingsRowBorder]}
+    >
+      <View style={[styles.iconWrap, { backgroundColor: (item.iconColor ?? PREMIUM_ACCENT) + '18' }]}>
+        <Ionicons name={item.icon} size={18} color={item.iconColor ?? PREMIUM_ACCENT} />
+      </View>
+      <View style={styles.settingsInfo}>
+        <Text style={styles.settingsLabel}>{item.label}</Text>
+        {item.value ? (
+          <Text style={styles.settingsValue} numberOfLines={2}>
+            {item.value}
+          </Text>
+        ) : null}
+      </View>
+      {item.toggle ? (
+        <Switch
+          value={item.toggleValue ?? false}
+          onValueChange={item.onToggle}
+          trackColor={{ false: 'rgba(255,255,255,0.12)', true: PREMIUM_ACCENT }}
+          thumbColor="#fff"
+        />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={PREMIUM_MUTED} />
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function DangerAction({
+  label,
+  icon,
+  onPress,
+  variant,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  variant: 'signOut' | 'delete';
+}) {
+  const tint = variant === 'delete' ? 'rgba(255,89,89,0.12)' : 'rgba(255,89,89,0.08)';
+  const border = variant === 'delete' ? 'rgba(255,89,89,0.35)' : 'rgba(255,89,89,0.22)';
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[styles.dangerCard, { backgroundColor: tint, borderColor: border }]}
+    >
+      <View style={[styles.dangerIcon, { backgroundColor: RED + '22' }]}>
+        <Ionicons name={icon} size={20} color={RED} />
+      </View>
+      <Text style={styles.dangerLabel}>{label}</Text>
+      <Ionicons name="chevron-forward" size={18} color={RED} />
+    </TouchableOpacity>
+  );
+}
+
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { colorScheme, toggleTheme } = useThemeStore();
   const { user, profile, signOut, deleteAccount, updateProfile } = useAuthStore();
-  const theme = colors[colorScheme];
 
-  const [darkMode, setDarkMode]       = useState(colorScheme === 'dark');
-  const [prefs, setPrefs]             = useState<NotifPrefs>(DEFAULT_PREFS);
+  const [darkMode, setDarkMode] = useState(colorScheme === 'dark');
+  const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
 
   const name = profile?.full_name?.trim() || user?.email?.split('@')[0] || 'User';
   const username = profile?.calfit_id?.trim() || '';
+  const calorieGoal = (profile as any)?.daily_calorie_goal ?? 2000;
+  const waterGoalL = ((profile as any)?.water_goal_ml ?? 2500) / 1000;
+  const unitsLabel =
+    (profile as any)?.units === 'imperial' ? 'Imperial (lbs, ft)' : 'Metric (kg, cm)';
 
-  // ── LOAD PREFS ON EVERY FOCUS — fixes the toggle reset bug ──
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    const init = async () => {
-      // Reload profile
-      if (user?.id) {
-        try {
-          const { supabase } = await import('../../services/supabase');
-          const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-          if (data && active) updateProfile(data);
-        } catch {}
-      }
-      // Reload notification prefs from SecureStore
-      const saved = await loadPrefs();
-      if (active) {
-        setPrefs(saved);
-        setDarkMode(colorScheme === 'dark');
-      }
-    };
-    init();
-    return () => { active = false; };
-  }, [user?.id, colorScheme]));
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const init = async () => {
+        if (user?.id) {
+          try {
+            const { supabase } = await import('../../services/supabase');
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            if (data && active) updateProfile(data);
+          } catch {}
+        }
+        const saved = await loadPrefs();
+        if (active) {
+          setPrefs(saved);
+          setDarkMode(colorScheme === 'dark');
+        }
+      };
+      init();
+      return () => {
+        active = false;
+      };
+    }, [user?.id, colorScheme]),
+  );
 
-  // ── PREF TOGGLE HELPER ────────────────────────────────────
-  // Updates state + persists to SecureStore in one call
   const updatePref = async (key: keyof NotifPrefs, val: boolean, sideEffect?: () => Promise<void>) => {
     const updated = { ...prefs, [key]: val };
     setPrefs(updated);
@@ -160,10 +230,9 @@ export default function SettingsScreen() {
     if (sideEffect) await sideEffect();
   };
 
-  // ── HANDLERS ─────────────────────────────────────────────
   const handleDarkMode = async (val: boolean) => {
     setDarkMode(val);
-    toggleTheme();
+    if ((colorScheme === 'dark') !== val) toggleTheme();
   };
 
   const handlePushToggle = async (val: boolean) => {
@@ -174,23 +243,24 @@ export default function SettingsScreen() {
     }
     if (!val) {
       await cancelAllReminders();
-      // Turn off all reminders too
       const updated: NotifPrefs = {
-        ...prefs, pushEnabled: false,
-        mealReminders: false, waterReminders: false,
-        workoutReminders: false, sleepReminders: false,
+        ...prefs,
+        pushEnabled: false,
+        streakReminders: false,
+        mealReminders: false,
+        waterReminders: false,
+        workoutReminders: false,
+        sleepReminders: false,
       };
       setPrefs(updated);
       await savePrefs(updated);
     } else {
       await updatePref('pushEnabled', true);
     }
-    Alert.alert(
-      val ? 'Notifications On' : 'Notifications Off',
-      val ? "You'll get streak, goal and activity alerts." : 'All Fitness App notifications disabled.',
-      [{ text: 'OK' }]
-    );
   };
+
+  const handleStreakReminders = async (val: boolean) =>
+    updatePref('streakReminders', val, () => scheduleStreakReminder(val));
 
   const handleMealReminders = async (val: boolean) =>
     updatePref('mealReminders', val, () => scheduleMealReminders(val));
@@ -246,196 +316,334 @@ export default function SettingsScreen() {
     }
   };
 
+  const renderRows = (items: RowItem[]) =>
+    items.map((item, i) => <SettingsRow key={item.label} item={item} isLast={i === items.length - 1} />);
+
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-
-      {/* ── HEADER ── */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => navigation.navigate('Main' as never)} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Settings</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* ── PROFILE CARD ── */}
-        <TouchableOpacity onPress={() => navigation.navigate('EditProfile' as never)} activeOpacity={0.85}
-          style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Avatar size={56} borderWidth={2} />
-          <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
-            <Text style={[styles.profileHandle, { color: theme.textMuted }]}>
-              {username ? `@${username}` : 'Set username in Edit Profile'}
-            </Text>
-             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <Ionicons name="settings-outline" size={12} color={theme.accent} />
-              <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '600' }}>Edit Profile</Text>
-            </View>
+    <AndroidSafeView backgroundColor={PREMIUM_BG} style={styles.safe}>
+      <PremiumAtmosphereBackground />
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={10}>
+            <Ionicons name="chevron-back" size={22} color={PREMIUM_TEXT} />
+          </TouchableOpacity>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Settings</Text>
+            <Text style={styles.headerSub}>Personalize your fitness experience</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Main', { screen: 'Progress' })}
-          style={[styles.progressRow, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}
-        >
-          <Ionicons name="trending-up" size={18} color={theme.accent} />
-          <Text style={[styles.progressRowText, { color: theme.accent }]}>View My Progress</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.accent} style={{ marginLeft: 'auto' }} />
-        </TouchableOpacity>
-
-        {/* ── APPEARANCE ── */}
-        <SettingsGroup theme={theme} title="Appearance" items={[
-          {
-            label: 'Dark Mode',
-            value: darkMode ? 'Dark theme active' : 'Light theme active',
-            icon: darkMode ? 'moon' : 'sunny',
-            iconColor: darkMode ? PURPLE : GOLD,
-            toggle: true, toggleValue: darkMode, onToggle: handleDarkMode,
-          },
-        ]} />
-
-        {/* ── FITNESS GOALS ── */}
-        <SettingsGroup theme={theme} title="Fitness" items={[
-          {
-            label: 'Goals',
-            value: `${(profile as any)?.daily_calorie_goal ?? 2000} kcal · ${((profile as any)?.water_goal_ml ?? 2500) / 1000}L water`,
-            icon: 'flag-outline', iconColor: theme.accent,
-            onPress: () => navigation.navigate('Main', { screen: 'Goals' }),
-          },
-          {
-            label: 'Units',
-            value: (profile as any)?.units === 'imperial' ? 'Imperial (lbs, ft)' : 'Metric (kg, cm)',
-            icon: 'speedometer-outline', iconColor: theme.accentSecond,
-            onPress: () => navigation.navigate('EditProfile' as never),
-          },
-        ]} />
-
-        {/* ── NOTIFICATIONS ── */}
-        <SettingsGroup theme={theme} title="Notifications" items={[
-          {
-            label: 'Push Notifications',
-            value: prefs.pushEnabled ? 'All alerts enabled' : 'All alerts disabled',
-            icon: 'notifications-outline', iconColor: GOLD,
-            toggle: true, toggleValue: prefs.pushEnabled, onToggle: handlePushToggle,
-          },
-          {
-            label: 'Streak Reminders',
-            value: 'Daily check-in alert',
-            icon: 'flame-outline', iconColor: ORANGE,
-            onPress: () => navigation.navigate('Main', { screen: 'Streaks' }),
-          },
-          {
-            label: 'Meal Reminders',
-            value: prefs.mealReminders ? '8am · 12pm · 7pm' : 'Off',
-            icon: 'restaurant-outline', iconColor: theme.accentSecond,
-            toggle: true, toggleValue: prefs.mealReminders, onToggle: handleMealReminders,
-          },
-          {
-            label: 'Water Reminder',
-            value: prefs.waterReminders ? 'Daily at 12:00 PM' : 'Off',
-            icon: 'water-outline', iconColor: theme.accentSecond,
-            toggle: true, toggleValue: prefs.waterReminders, onToggle: handleWaterReminder,
-          },
-          {
-            label: 'Workout Reminder',
-            value: prefs.workoutReminders ? 'Daily at 7:00 AM' : 'Off',
-            icon: 'barbell-outline', iconColor: theme.accent,
-            toggle: true, toggleValue: prefs.workoutReminders, onToggle: handleWorkoutReminder,
-          },
-          {
-            label: 'Sleep Reminder',
-            value: prefs.sleepReminders ? 'Daily at 10:00 PM' : 'Off',
-            icon: 'moon-outline', iconColor: PURPLE,
-            toggle: true, toggleValue: prefs.sleepReminders, onToggle: handleSleepReminder,
-          },
-        ]} />
-
-        {/* ── ACCOUNT & PRIVACY ── */}
-        <SettingsGroup theme={theme} title="Account & Privacy" items={[
-          {
-            label: 'Privacy & Data Policy',
-            value: 'How we use your data',
-            icon: 'shield-outline', iconColor: theme.accentSecond,
-            onPress: () => navigation.navigate('Main', { screen: 'Privacy' }),
-          },
-          {
-            label: 'Download My Data',
-            value: 'Export all your activity as PDF or CSV',
-            icon: 'download-outline', iconColor: theme.textSecondary,
-            onPress: () => navigation.navigate('Main', { screen: 'DownloadData' }),
-          },
-          {
-            label: 'Sign Out',
-            icon: 'log-out-outline', iconColor: RED,
-            danger: true, onPress: handleSignOut,
-          },
-          {
-            label: 'Delete Account',
-            icon: 'trash-outline', iconColor: RED,
-            danger: true, onPress: handleDeleteAccount,
-          },
-        ]} />
-
-        {/* ── APP INFO ── */}
-        <View style={styles.appInfo}>
-          <Text style={[styles.appInfoText, { color: theme.textMuted }]}>Fitness App v1.0.0 — Demo</Text>
         </View>
 
-        <View style={{ height: 60 }} />
-      </ScrollView>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EditProfile')}
+            activeOpacity={0.88}
+            style={[styles.profileCard, premiumGlassShadow()]}
+          >
+            <LinearGradient
+              colors={['rgba(45,220,140,0.14)', 'rgba(45,220,140,0.04)', 'transparent'] as [string, string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <Avatar size={56} borderWidth={2} />
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{name}</Text>
+              <Text style={styles.profileHandle}>
+                {username ? `@${username}` : 'Set username in Edit Profile'}
+              </Text>
+              <View style={styles.editRow}>
+                <Ionicons name="settings-outline" size={13} color={PREMIUM_ACCENT} />
+                <Text style={styles.editLink}>Edit Profile</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={PREMIUM_MUTED} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Main', { screen: 'Progress' })}
+            activeOpacity={0.88}
+            style={[styles.progressCard, premiumGlassShadow()]}
+          >
+            <LinearGradient
+              colors={['rgba(45,220,140,0.12)', 'transparent'] as [string, string]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={[styles.progressIcon, { backgroundColor: PREMIUM_ACCENT + '22' }]}>
+              <Ionicons name="trending-up" size={22} color={PREMIUM_ACCENT} />
+            </View>
+            <View style={styles.progressText}>
+              <Text style={styles.progressTitle}>View My Progress</Text>
+              <Text style={styles.progressSub}>Track your journey and see your improvements</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={PREMIUM_MUTED} />
+          </TouchableOpacity>
+
+          <SettingsSection
+            icon="color-palette-outline"
+            iconColor={PURPLE}
+            title="Appearance"
+            subtitle="Customize your look"
+          >
+            {renderRows([
+              {
+                label: 'Dark Mode',
+                value: darkMode ? 'Switch between light and dark theme' : 'Switch between light and dark theme',
+                icon: darkMode ? 'moon-outline' : 'sunny-outline',
+                iconColor: darkMode ? PURPLE : GOLD,
+                toggle: true,
+                toggleValue: darkMode,
+                onToggle: handleDarkMode,
+              },
+            ])}
+          </SettingsSection>
+
+          <SettingsSection icon="barbell-outline" iconColor={PREMIUM_ACCENT} title="Fitness" subtitle="Stay on track with smart reminders">
+            {renderRows([
+              {
+                label: 'Goals',
+                value: `${calorieGoal} kcal · ${waterGoalL}L water`,
+                icon: 'flag-outline',
+                iconColor: PREMIUM_ACCENT,
+                onPress: () => navigation.navigate('Main', { screen: 'Goals' }),
+              },
+              {
+                label: 'Units',
+                value: unitsLabel,
+                icon: 'speedometer-outline',
+                iconColor: BLUE,
+                onPress: () => navigation.navigate('EditProfile'),
+              },
+            ])}
+          </SettingsSection>
+
+          <SettingsSection icon="notifications-outline" iconColor={PURPLE} title="Notifications" subtitle="Get timely reminders">
+            {renderRows([
+              {
+                label: 'Push Notifications',
+                value: prefs.pushEnabled ? 'All alerts enabled' : 'All alerts disabled',
+                icon: 'notifications-outline',
+                iconColor: PREMIUM_ACCENT,
+                toggle: true,
+                toggleValue: prefs.pushEnabled,
+                onToggle: handlePushToggle,
+              },
+              {
+                label: 'Streak Reminders',
+                value: 'Daily check-in alert',
+                icon: 'flame-outline',
+                iconColor: ORANGE,
+                toggle: true,
+                toggleValue: prefs.streakReminders,
+                onToggle: handleStreakReminders,
+              },
+              {
+                label: 'Meal Reminders',
+                value: 'Remind me to log meals',
+                icon: 'restaurant-outline',
+                iconColor: PURPLE,
+                toggle: true,
+                toggleValue: prefs.mealReminders,
+                onToggle: handleMealReminders,
+              },
+              {
+                label: 'Water Reminder',
+                value: 'Stay hydrated',
+                icon: 'water-outline',
+                iconColor: BLUE,
+                toggle: true,
+                toggleValue: prefs.waterReminders,
+                onToggle: handleWaterReminder,
+              },
+              {
+                label: 'Workout Reminder',
+                value: 'Time for your workout',
+                icon: 'barbell-outline',
+                iconColor: RED,
+                toggle: true,
+                toggleValue: prefs.workoutReminders,
+                onToggle: handleWorkoutReminder,
+              },
+              {
+                label: 'Sleep Reminder',
+                value: 'Get reminded to sleep',
+                icon: 'moon-outline',
+                iconColor: PURPLE,
+                toggle: true,
+                toggleValue: prefs.sleepReminders,
+                onToggle: handleSleepReminder,
+              },
+            ])}
+          </SettingsSection>
+
+          <SettingsSection
+            icon="shield-outline"
+            iconColor={BLUE}
+            title="Account & Privacy"
+            subtitle="Manage your data and privacy"
+          >
+            {renderRows([
+              {
+                label: 'Privacy & Data Policy',
+                value: 'How we use your data',
+                icon: 'shield-outline',
+                iconColor: BLUE,
+                onPress: () => navigation.navigate('Main', { screen: 'Privacy' }),
+              },
+              {
+                label: 'Download My Data',
+                value: 'Export all your activity as PDF or CSV',
+                icon: 'download-outline',
+                iconColor: PURPLE,
+                onPress: () => navigation.navigate('Main', { screen: 'DownloadData' }),
+              },
+            ])}
+          </SettingsSection>
+
+          <View style={styles.dangerBlock}>
+            <DangerAction label="Sign Out" icon="log-out-outline" onPress={handleSignOut} variant="signOut" />
+            <DangerAction label="Delete Account" icon="trash-outline" onPress={handleDeleteAccount} variant="delete" />
+          </View>
+
+          <Text style={styles.appInfo}>Fitness App v1.0.0 — Demo</Text>
+          <View style={{ height: 48 }} />
+        </ScrollView>
+      </View>
     </AndroidSafeView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1 },
-  scroll: { paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  backBtn:{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  safe: { flex: 1, backgroundColor: PREMIUM_BG },
+  root: { flex: 1 },
+  scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
 
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER,
+    backgroundColor: PREMIUM_GLASS,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: { flex: 1 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: PREMIUM_TEXT },
+  headerSub: { fontSize: fontSize.sm, color: PREMIUM_MUTED, marginTop: 2 },
+
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg + 2,
+    borderWidth: 1,
+    borderColor: 'rgba(45,220,140,0.22)',
+    backgroundColor: PREMIUM_GLASS,
+    overflow: 'hidden',
+  },
   profileInfo: { flex: 1 },
-  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  profileName: { fontSize: fontSize.base, fontWeight: '700' },
-  tierBadge:   { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.sm, borderWidth: 1 },
-  tierText:    { fontSize: 10, fontWeight: '700' },
-  profileHandle:{ fontSize: fontSize.sm, marginTop: 2 },
-  editLink:    { fontSize: fontSize.sm, fontWeight: '600', marginTop: 4 },
+  profileName: { fontSize: fontSize.lg, fontWeight: '800', color: PREMIUM_TEXT },
+  profileHandle: { fontSize: fontSize.sm, color: PREMIUM_MUTED, marginTop: 2 },
+  editRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm },
+  editLink: { color: PREMIUM_ACCENT, fontSize: fontSize.sm, fontWeight: '700' },
 
-  progressRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
-  progressRowText: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
+  progressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg + 2,
+    borderWidth: 1,
+    borderColor: 'rgba(45,220,140,0.18)',
+    backgroundColor: PREMIUM_GLASS,
+    overflow: 'hidden',
+  },
+  progressIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressText: { flex: 1 },
+  progressTitle: { fontSize: fontSize.base, fontWeight: '800', color: PREMIUM_TEXT },
+  progressSub: { fontSize: fontSize.xs, color: PREMIUM_MUTED, marginTop: 4, lineHeight: 16 },
 
-  group:      { marginTop: spacing.lg, paddingHorizontal: spacing.lg },
-  groupTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: spacing.xs },
-  groupCard:  { borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  iconWrap:   { width: 34, height: 34, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  settingsInfo:{ flex: 1 },
-  settingsLabel:{ fontSize: fontSize.base },
-  settingsValue:{ fontSize: fontSize.xs, marginTop: 1 },
-  appInfo: { alignItems: 'center', paddingVertical: spacing.xl, gap: 4 },
-  appInfoText: { fontSize: fontSize.xs },
+  section: { marginTop: spacing.xl },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  sectionHeadIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeadText: { flex: 1 },
+  sectionTitle: { fontSize: fontSize.base, fontWeight: '800', color: PREMIUM_TEXT },
+  sectionSub: { fontSize: fontSize.xs, color: PREMIUM_MUTED, marginTop: 2 },
+  sectionCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: PREMIUM_GLASS_BORDER,
+    backgroundColor: PREMIUM_GLASS,
+    overflow: 'hidden',
+  },
 
-  supportCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
-  supportGrad: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-  supportIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  supportInfo: { flex: 1 },
-  supportTitle: { fontSize: fontSize.base, fontWeight: '700' },
-  supportDesc: { fontSize: fontSize.xs, marginTop: 2, lineHeight: 16 },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md + 2,
+  },
+  settingsRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: PREMIUM_GLASS_BORDER },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  settingsInfo: { flex: 1 },
+  settingsLabel: { fontSize: fontSize.sm, fontWeight: '700', color: PREMIUM_TEXT },
+  settingsValue: { fontSize: fontSize.xs, color: PREMIUM_MUTED, marginTop: 3, lineHeight: 16 },
 
-  commissionCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
-  commissionIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  commissionInfo: { flex: 1 },
-  commissionTitle: { fontSize: fontSize.base, fontWeight: '700' },
-  commissionDesc: { fontSize: fontSize.xs, marginTop: 2, lineHeight: 16 },
+  dangerBlock: { marginTop: spacing.xl, gap: spacing.sm },
+  dangerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  dangerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerLabel: { flex: 1, fontSize: fontSize.base, fontWeight: '800', color: RED },
 
-  socialCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
-  socialTitle: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: spacing.sm, textAlign: 'center' },
-  socialRow: { flexDirection: 'row', gap: spacing.sm },
-  socialBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1 },
-  socialBtnLabel: { fontSize: fontSize.sm, fontWeight: '700' },
+  appInfo: {
+    textAlign: 'center',
+    fontSize: fontSize.xs,
+    color: PREMIUM_MUTED,
+    marginTop: spacing.xl,
+  },
 });

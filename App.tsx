@@ -39,6 +39,21 @@ export default function App() {
         + "textarea,input{-webkit-user-select:text;user-select:text;}"
         + "#welcome-scroll{overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}";
       document.head.appendChild(style);
+
+      const upsertLink = (rel: string, href: string, type?: string) => {
+        let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = rel;
+          document.head.appendChild(link);
+        }
+        link.href = href;
+        if (type) link.type = type;
+        else link.removeAttribute('type');
+      };
+      upsertLink('icon', '/favicon.svg', 'image/svg+xml');
+      upsertLink('alternate icon', '/favicon.png', 'image/png');
+
       return () => { clearTimeout(t); document.head.removeChild(style); };
     }
     return () => clearTimeout(t);
@@ -61,10 +76,20 @@ export default function App() {
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
-      setSession(session);
+
       if (session?.user) {
-        await loadProfile(session.user.id);
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData.user) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+        } else {
+          setSession(session);
+          await loadProfile(session.user.id);
+        }
+      } else {
+        setSession(null);
       }
+
       if (mounted) useAuthStore.setState({ authReady: true });
 
       if (session?.user) {
@@ -78,7 +103,15 @@ export default function App() {
       }
     })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const { data: userData, error } = await supabase.auth.getUser();
+        if (error || !userData.user) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+          return;
+        }
+      }
       setSession(session);
       if (session?.user) {
         loadProfile(session.user.id).catch(() => {});
