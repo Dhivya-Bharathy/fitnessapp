@@ -213,7 +213,7 @@ function TabNavigator() {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, sceneContainerStyle: { flex: 1 } }}
     >
       <Tab.Screen name="Home"     component={HomeScreen} />
       <Tab.Screen name="Calorie"  component={CalorieScreen} />
@@ -280,7 +280,7 @@ function AuthStack() {
     <RootStack.Navigator
       key={`auth-stack-${authEpoch}`}
       initialRouteName={initialRoute}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, contentStyle: { flex: 1 } }}
     >
       <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
       <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
@@ -294,7 +294,7 @@ function AuthStack() {
 // ── APP STACK (no default headers — screens have own back buttons) ──
 function AppStack() {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+    <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { flex: 1 } }}>
       <RootStack.Screen name="Main"                    component={TabNavigator} />
       <RootStack.Screen name="Settings"                component={SettingsScreen} />
       <RootStack.Screen name="EditProfile"             component={EditProfileScreen} />
@@ -323,7 +323,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer key={navKey}>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { flex: 1 } }}>
         <RootStack.Screen
           name={showAuth ? 'Auth' : 'App'}
           component={showAuth ? AuthStack : AppStack}

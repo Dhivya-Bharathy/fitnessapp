@@ -7,9 +7,9 @@ import {
   Platform,
   Alert,
   Image,
-  ScrollView,
   useWindowDimensions,
 } from 'react-native';
+import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -105,10 +105,12 @@ export default function WelcomeScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: BG, paddingTop: insets.top }]}>
-      <ScrollView
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+      <ScreenScrollView
+        showsVerticalScrollIndicator={Platform.OS !== 'web'}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.md },
+        ]}
       >
         <View style={[styles.heroWrap, { height: heroHeight }]}>
           <Image source={HERO} style={styles.heroImage} resizeMode="cover" />
@@ -146,47 +148,47 @@ export default function WelcomeScreen() {
             ))}
           </View>
         </View>
-      </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-        <TouchableOpacity
-          disabled={googleLoading}
-          onPress={onGetStarted}
-          activeOpacity={0.88}
-          style={styles.primaryBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Get started with Google"
-        >
-          {googleLoading ? (
-            <ActivityIndicator color="#050608" />
-          ) : (
-            <>
-              <Text style={styles.primaryBtnText}>Get Started</Text>
-              <Ionicons name="arrow-forward" size={20} color="#050608" />
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.footer}>
+          <TouchableOpacity
+            disabled={googleLoading}
+            onPress={onGetStarted}
+            activeOpacity={0.88}
+            style={styles.primaryBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Get started with Google"
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#050608" />
+            ) : (
+              <>
+                <Text style={styles.primaryBtnText}>Get Started</Text>
+                <Ionicons name="arrow-forward" size={20} color="#050608" />
+              </>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          disabled={googleLoading}
-          onPress={onGetStarted}
-          activeOpacity={0.85}
-          style={styles.googleRow}
-        >
-          <Text style={styles.googleG}>G</Text>
-          <Text style={styles.googleLabel}>Continue with Google</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            disabled={googleLoading}
+            onPress={onGetStarted}
+            activeOpacity={0.85}
+            style={styles.googleRow}
+          >
+            <Text style={styles.googleG}>G</Text>
+            <Text style={styles.googleLabel}>Continue with Google</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.legal}>
-          By continuing, you agree to our Terms & Privacy. Your progress syncs when you sign in.
-        </Text>
-      </View>
+          <Text style={styles.legal}>
+            By continuing, you agree to our Terms & Privacy. Your progress syncs when you sign in.
+          </Text>
+        </View>
+      </ScreenScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, minHeight: 0 },
   scrollContent: { flexGrow: 1 },
   heroWrap: {
     width: '100%',
@@ -279,11 +281,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
     gap: spacing.sm,
+    marginTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: BG,
   },
   primaryBtn: {
     flexDirection: 'row',
