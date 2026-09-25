@@ -21,6 +21,7 @@ import {
   isWellnessLight,
   WELLNESS_GREEN,
 } from '../../components/wellness';
+import { ScreenScrollView } from '../../components/ScreenScrollView';
 
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -608,7 +609,7 @@ export default function CalorieScreen() {
       />
 
       {activeView === 'tracker' ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
+        <ScreenScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
 
           <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
@@ -646,7 +647,7 @@ export default function CalorieScreen() {
           />
 
           <View style={{ height: 40 }} />
-        </ScrollView>
+        </ScreenScrollView>
       ) : (
         <MealPlanTab theme={theme} />
       )}

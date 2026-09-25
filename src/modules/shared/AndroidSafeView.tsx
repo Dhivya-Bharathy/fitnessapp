@@ -11,6 +11,12 @@ interface Props {
 export function AndroidSafeView({ children, style, backgroundColor }: Props) {
   const insets = useSafeAreaInsets();
 
+  const body = (
+    <View style={styles.body}>
+      {children}
+    </View>
+  );
+
   if (Platform.OS === 'web') {
     return (
       <View
@@ -25,33 +31,31 @@ export function AndroidSafeView({ children, style, backgroundColor }: Props) {
           style,
         ]}
       >
-        {children}
+        {body}
       </View>
     );
   }
 
   if (Platform.OS === 'ios') {
     return (
-      <SafeAreaView
-        style={[{ flex: 1, backgroundColor }, style]}
-      >
-        {children}
+      <SafeAreaView style={[{ flex: 1, backgroundColor }, style]}>
+        {body}
       </SafeAreaView>
     );
   }
 
   return (
-    <View style={[{
-      flex: 1,
-      backgroundColor,
-      paddingTop: insets.top,
-    }, style]}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
-      />
-      {children}
+    <View style={[{ flex: 1, backgroundColor, paddingTop: insets.top }, style]}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      {body}
     </View>
   );
 }
+
+const styles = {
+  body: {
+    flex: 1,
+    minHeight: 0,
+    position: 'relative' as const,
+  },
+};

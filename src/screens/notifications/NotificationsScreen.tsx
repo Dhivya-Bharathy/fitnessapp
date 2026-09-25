@@ -228,6 +228,7 @@ export default function NotificationsScreen() {
 
       {/* ── NOTIFICATION LIST ── */}
       <FlatList
+        style={styles.listFlex}
         data={filtered}
         keyExtractor={n => n.id}
         contentContainerStyle={styles.list}
@@ -256,6 +257,7 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   safe:     { flex: 1 },
+  listFlex: { flex: 1, minHeight: 0 },
   header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
   backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },

@@ -14,6 +14,7 @@ import { supabase } from '../../services/supabase';
 import { MoodTrendChart } from '../../components/TrendCharts';
 import { exportProgressReport } from '../../utils/pdf-export';
 import { PastelScreenBackground, isWellnessLight, softCardShadow } from '../../components/wellness';
+import { ScreenScrollView } from '../../components/ScreenScrollView';
 
 const { width: SW } = Dimensions.get('window');
 const PINK   = '#FF6B9D';
@@ -271,7 +272,7 @@ export default function ProgressScreen() {
         ))}
       </View>
 
-      <ScrollView
+      <ScreenScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={PURPLE} colors={[PURPLE]} />}
@@ -460,7 +461,7 @@ export default function ProgressScreen() {
         )}
 
         <View style={{ height: 80 }} />
-      </ScrollView>
+      </ScreenScrollView>
     </AndroidSafeView>
   );
 }

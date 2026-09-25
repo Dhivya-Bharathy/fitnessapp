@@ -16,6 +16,7 @@ import { EmptyState } from '../../shared/EmptyState';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { usePartner } from '../hooks/usePartner';
 import { PastelScreenBackground, isWellnessLight } from '../../../components/wellness';
+import { ScreenScrollView } from '../../../components/ScreenScrollView';
 // ── SAFE COLORS ───────────────────────────────────────────────
 const BLUE   = '#6699FF';
 const PURPLE = '#B280FF';
@@ -345,7 +346,7 @@ export default function AccountabilityScreen() {
           <ActivityIndicator color={theme.accent} size="large" />
         </View>
       ) : (
-        <ScrollView
+        <ScreenScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
           refreshControl={
@@ -465,7 +466,7 @@ export default function AccountabilityScreen() {
           </View>
 
           <View style={{ height: 80 }} />
-        </ScrollView>
+        </ScreenScrollView>
       )}
 
       <PartnerInviteSheet

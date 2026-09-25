@@ -4,6 +4,7 @@ import {
   Dimensions, Platform, RefreshControl,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
+import { ScreenScrollView } from '../../components/ScreenScrollView';
 import Svg from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,8 +74,11 @@ export default function WorkoutScreen() {
 
   const loadData = async () => {
     setLoadingData(true);
-    await Promise.all([loadRoutines(), loadRecentSessions()].map(p => p.catch(() => {})));
-    setLoadingData(false);
+    try {
+      await Promise.all([loadRoutines(), loadRecentSessions()].map(p => p.catch(() => {})));
+    } finally {
+      setLoadingData(false);
+    }
   };
 
   useFocusEffect(useCallback(() => {
@@ -118,7 +122,7 @@ export default function WorkoutScreen() {
           </View>
         </View>
       ) : (
-      <ScrollView
+      <ScreenScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
@@ -222,7 +226,7 @@ export default function WorkoutScreen() {
             <Text style={[styles.emptySub, { color: theme.textMuted }]}>Tap "Start Workout" to build one</Text>
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.routineScroll}>
+          <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={styles.routineScroll}>
             {routines.slice(0, 5).map(r => {
               const firstCat = r.exercises[0]?.category || 'Full Body';
               const cardColor = CAT_COLORS[firstCat] || theme.accent;
@@ -269,7 +273,7 @@ export default function WorkoutScreen() {
           </>
         )}
 
-      </ScrollView>
+      </ScreenScrollView>
       )}
     </AndroidSafeView>
   );

@@ -2,7 +2,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   RefreshControl,
   FlatList,
@@ -21,6 +20,7 @@ import { getTodayCalories, getTodayWater, logWater } from '../../services/profil
 import { supabase } from '../../services/supabase';
 
 // ── NEW: Comeback Banner ──────────────────────────────────────
+import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ComebackBanner } from '../../components/ComebackBanner';
 import { BurnoutBanner } from '../../components/BurnoutBanner';
 import {
@@ -560,7 +560,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <ScreenScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}
@@ -600,7 +600,7 @@ export default function HomeScreen() {
           <HomeStreaksSection theme={theme} streakCount={streakCount} />
         </View>
         <View style={{ height: spacing.xl }} />
-      </ScrollView>
+      </ScreenScrollView>
     </AndroidSafeView>
   );
 }

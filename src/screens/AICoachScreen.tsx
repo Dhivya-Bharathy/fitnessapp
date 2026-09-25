@@ -157,9 +157,11 @@ export default function AICoachScreen() {
 
   const renderEmptyChat = () => (
     <ScrollView
+      style={styles.chatEmptyFlex}
       contentContainerStyle={styles.chatEmptyScroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
     >
       <View style={[styles.chatEmptyIconWrap, { backgroundColor: accent + '15' }]}>
         <Ionicons name="sparkles" size={36} color={accent} />
@@ -443,7 +445,7 @@ export default function AICoachScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: wellness ? 'transparent' : theme.bg, paddingTop: insets.top }]}>
-      {wellness && <PastelScreenBackground />}
+      {wellness ? <PastelScreenBackground /> : null}
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -526,7 +528,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: fontSize.sm, marginTop: 2 },
   profileBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
-  content: { flex: 1, paddingBottom: 88 },
+  content: { flex: 1, minHeight: 0, paddingBottom: 88 },
 
   // Generate tab
   scroll: { flex: 1 },
@@ -564,7 +566,8 @@ const styles = StyleSheet.create({
   errorText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
 
   // Chat styles
-  chatContainer: { flex: 1 },
+  chatContainer: { flex: 1, minHeight: 0 },
+  chatEmptyFlex: { flex: 1, minHeight: 0 },
   chatListFlex: { flex: 1 },
   chatList: { paddingTop: spacing.xs, paddingBottom: spacing.md, flexGrow: 1 },
   chatActions: { flexDirection: 'row', justifyContent: 'center', paddingVertical: spacing.xs, borderBottomWidth: 0.5 },
