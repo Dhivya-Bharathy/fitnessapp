@@ -10,6 +10,7 @@ import {
   searchCalfitUsers,
   CalfitUserSuggestion,
 } from '../services/PartnerService';
+import { softCardShadow } from '../../../components/wellness';
 
 interface Props {
   theme: typeof colors.dark;
@@ -83,7 +84,7 @@ export function PartnerInviteSheet({
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <TouchableOpacity style={styles.dismiss} onPress={handleClose} />
-        <View style={[styles.sheet, {
+        <View style={[styles.sheet, softCardShadow(), {
           backgroundColor: theme.card,
           borderColor: theme.border,
         }]}>
@@ -171,24 +172,26 @@ export function PartnerInviteSheet({
 
             <View style={[styles.privacyNote, {
               backgroundColor: theme.accentDim as string,
-              borderColor: theme.accent,
+              borderColor: theme.accent + '55',
             }]}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={theme.accent} />
-              <Text style={[styles.privacyText, { color: theme.accent }]}>
-                Only fitness progress and streaks are shared. No personal info.
+              <Ionicons name="shield-checkmark-outline" size={16} color={theme.accent} />
+              <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
+                Privacy: only streaks and fitness progress are shared — never personal details.
               </Text>
             </View>
 
             <TouchableOpacity
               onPress={handleAdd}
               disabled={isAdding || !calfitId.trim()}
+              activeOpacity={calfitId.trim() ? 0.85 : 1}
               style={[styles.addBtn, {
                 backgroundColor: calfitId.trim() ? theme.accent : theme.border,
+                opacity: calfitId.trim() ? 1 : 0.45,
               }]}
             >
               {isAdding
-                ? <ActivityIndicator color={theme.bg} />
-                : <Text style={[styles.addBtnText, { color: theme.bg }]}>Add Partner</Text>
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={[styles.addBtnText, { color: '#fff' }]}>Add Partner</Text>
               }
             </TouchableOpacity>
           </View>

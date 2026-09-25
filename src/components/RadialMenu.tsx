@@ -15,11 +15,11 @@ interface RadialItem {
 }
 
 const ITEMS: RadialItem[] = [
-  { key: 'Activity',     label: 'Activity',     icon: 'barbell-outline',    gradient: ['#FFB347', '#FF8C00'],  textColor: '#FFB347' },
-  { key: 'Health',       label: 'Health',       icon: 'heart-outline',      gradient: ['#FF6B9D', '#E04A7A'],  textColor: '#FF6B9D' },
-  { key: 'FoodScanner',  label: 'Scan Food',   icon: 'camera-outline',     gradient: ['#4A90E2', '#357ABD'],  textColor: '#4A90E2' },
-  { key: 'MealPlans',    label: 'Meal Plans',  icon: 'restaurant-outline', gradient: ['#34D98A', '#0DAE6C'],  textColor: '#34D98A' },
-  { key: 'Progress',     label: 'Progress',    icon: 'trending-up',        gradient: ['#9B6FE8', '#7B3FE4'],  textColor: '#9B6FE8' },
+  { key: 'FoodScanner', label: 'Scan Food',  icon: 'camera-outline',     gradient: ['#4A90E2', '#357ABD'], textColor: '#4A90E2' },
+  { key: 'MealPlans',   label: 'Meal Plan',  icon: 'restaurant-outline', gradient: ['#34D98A', '#0DAE6C'], textColor: '#34D98A' },
+  { key: 'Activity',    label: 'Activity',   icon: 'barbell-outline',    gradient: ['#FFB347', '#FF8C00'], textColor: '#FFB347' },
+  { key: 'Progress',    label: 'Progress',   icon: 'trending-up',        gradient: ['#9B6FE8', '#7B3FE4'], textColor: '#9B6FE8' },
+  { key: 'Health',      label: 'Health',     icon: 'heart-outline',      gradient: ['#FF6B9D', '#E04A7A'], textColor: '#FF6B9D' },
 ];
 
 interface Props {

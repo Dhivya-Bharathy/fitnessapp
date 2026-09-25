@@ -22,7 +22,7 @@ const palette = {
 
   // ── Lavender (light mode backgrounds) ──────────────────────
   lavender50:  '#F9F7FF',  // lightest — modal bg
-  lavender100: '#F4F0FF',  // main app background
+  lavender100: '#ECEEF6',  // main app background (mockup soft gray-lavender)
   lavender200: '#EAE3FF',  // surface / section bg
   lavender300: '#D8CEFF',  // borders, dividers
 

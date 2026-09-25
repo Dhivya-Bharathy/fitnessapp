@@ -13,6 +13,8 @@ type Props = {
   /** Extra bottom padding inside scroll (above footer). */
   scrollPaddingBottom?: number;
   padHorizontal?: boolean;
+  /** When false, scroll body uses natural height (avoids web flex collapse). */
+  scrollFlexGrow?: boolean;
 };
 
 /**
@@ -25,6 +27,7 @@ export function StickyFooterLayout({
   children,
   scrollPaddingBottom = spacing.md,
   padHorizontal = true,
+  scrollFlexGrow = true,
 }: Props) {
   const footerInset = useFooterInset(spacing.sm);
   const { scrollViewStyle, scrollProps } = useMobileScrollProps();
@@ -34,11 +37,12 @@ export function StickyFooterLayout({
       <View style={styles.column}>
         {header}
         <ScrollView
-          style={[styles.scroll, scrollViewStyle]}
+          style={[styles.scroll, scrollViewStyle, Platform.OS === 'web' && styles.scrollWeb]}
           contentContainerStyle={[
-            styles.scrollContent,
+            scrollFlexGrow && styles.scrollContent,
             padHorizontal && styles.scrollPadH,
             { paddingBottom: scrollPaddingBottom },
+            Platform.OS === 'web' && styles.scrollContentWeb,
           ]}
           keyboardShouldPersistTaps="always"
           showsVerticalScrollIndicator={Platform.OS === 'web'}
@@ -60,7 +64,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   column: { flex: 1, minHeight: 0 },
   scroll: { flex: 1 },
+  scrollWeb: { overflowX: 'hidden' as const, maxWidth: '100%' as const },
   scrollContent: { flexGrow: 1 },
+  scrollContentWeb: { maxWidth: '100%' as const },
   scrollPadH: { paddingHorizontal: spacing.lg },
   footer: {
     paddingHorizontal: spacing.lg,

@@ -3,6 +3,8 @@ import type { Profile } from '../services/profileService';
 
 /** Stored in profiles.tracking_preferences when the 22-question AI intake is complete. */
 export const FITNESS_ASSESSMENT_DONE = 'fitness_assessment_done';
+/** User chose to enter the app first; can finish intake later from AI Coach. */
+export const FITNESS_ASSESSMENT_DEFERRED = 'fitness_assessment_deferred';
 
 const LOCAL_ASSESSMENT_KEY = '@fitness_assessment_complete_v1';
 const FORCE_RETAKE_KEY = '@fitness_force_assessment_retake_v1';
@@ -23,8 +25,46 @@ export async function readForceAssessmentRetake(): Promise<boolean> {
   }
 }
 
+function onboardingBioFields(profile: Profile | null | undefined): {
+  full_name?: string;
+  calfit_id?: string;
+  goal?: string;
+} {
+  const raw = profile?.bio;
+  if (!raw || typeof raw !== 'string') return {};
+  try {
+    const parsed = JSON.parse(raw) as { onboarding_v1?: Record<string, unknown> };
+    const o = parsed.onboarding_v1;
+    if (!o || typeof o !== 'object') return {};
+    return {
+      full_name: typeof o.display_name === 'string' ? o.display_name : undefined,
+      calfit_id: typeof o.username === 'string' ? o.username : undefined,
+      goal: typeof o.goal === 'string' ? o.goal : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Google + name + Fitness ID saved (step before the 22-question intake). */
+export function isProfileSetupComplete(profile: Profile | null | undefined): boolean {
+  const bio = onboardingBioFields(profile);
+  return !!(
+    (profile?.goal?.trim() || bio.goal?.trim())
+    && (profile?.full_name?.trim() || bio.full_name?.trim())
+    && (profile?.calfit_id?.trim() || bio.calfit_id?.trim())
+  );
+}
+
 export function isFitnessAssessmentComplete(profile: Profile | null | undefined): boolean {
-  return profile?.tracking_preferences?.includes(FITNESS_ASSESSMENT_DONE) ?? false;
+  const prefs = profile?.tracking_preferences ?? [];
+  return prefs.includes(FITNESS_ASSESSMENT_DONE) || prefs.includes(FITNESS_ASSESSMENT_DEFERRED);
+}
+
+export function mergeDeferredAssessmentPrefs(existing: string[] | null | undefined): string[] {
+  const base = (existing ?? []).filter(Boolean).filter((p) => p !== FITNESS_ASSESSMENT_DONE);
+  if (base.includes(FITNESS_ASSESSMENT_DEFERRED)) return base;
+  return [...base, FITNESS_ASSESSMENT_DEFERRED];
 }
 
 export function mergeAssessmentDonePrefs(existing: string[] | null | undefined): string[] {

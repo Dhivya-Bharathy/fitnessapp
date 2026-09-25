@@ -23,14 +23,20 @@ import { supabase } from '../../services/supabase';
 // ── NEW: Comeback Banner ──────────────────────────────────────
 import { ComebackBanner } from '../../components/ComebackBanner';
 import { BurnoutBanner } from '../../components/BurnoutBanner';
+import {
+  PastelScreenBackground,
+  GlassCard,
+  glassSurface,
+  isWellnessLight,
+} from '../../components/wellness';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDE_GAP = 12;
 const SLIDE_W = SCREEN_W - spacing.lg * 2;
 
 // ── STREAK ROW — fixed at top, not in carousel ────────────────
-function StreakRow({ theme, streakCount }: {
-  theme: typeof colors.light; streakCount: number;
+function StreakRow({ theme, streakCount, wellness }: {
+  theme: typeof colors.light; streakCount: number; wellness?: boolean;
 }) {
   const navigation = useNavigation<any>();
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -44,12 +50,8 @@ function StreakRow({ theme, streakCount }: {
     return { label, date: d.getDate(), dow: i };
   });
 
-  return (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('Streaks')}
-      activeOpacity={0.85}
-      style={[styles.streakCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-    >
+  const cardBody = (
+    <>
       <View style={styles.streakTopRow}>
         <Text style={[styles.streakCardLabel, { color: theme.textPrimary }]}>This Week</Text>
         <View style={[styles.streakPill, { backgroundColor: 'rgba(255,107,53,0.12)', borderColor: theme.gradMid }]}>
@@ -81,6 +83,27 @@ function StreakRow({ theme, streakCount }: {
           );
         })}
       </View>
+    </>
+  );
+
+  if (wellness) {
+    return (
+      <GlassCard
+        onPress={() => navigation.navigate('Streaks')}
+        style={[styles.streakCard, { marginHorizontal: spacing.lg, marginBottom: spacing.md }]}
+      >
+        {cardBody}
+      </GlassCard>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.navigate('Streaks')}
+      activeOpacity={0.85}
+      style={[styles.streakCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+    >
+      {cardBody}
     </TouchableOpacity>
   );
 }
@@ -315,10 +338,11 @@ function HeroCarousel({ theme, consumed, goal, waterMl, waterGoalMl, liveSteps, 
 }
 
 // ── STAT CARDS — static below carousel ───────────────────────
-function StatCards({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs }: {
+function StatCards({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs, wellness }: {
   theme: typeof colors.light;
   waterMl: number; waterGoalMl: number;
   liveSteps: number; stepGoal: number; sleepHrs: number;
+  wellness?: boolean;
 }) {
   const navigation = useNavigation<any>();
   const waterL = (waterMl / 1000).toFixed(1);
@@ -335,7 +359,12 @@ function StatCards({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs 
     <View style={styles.smallCardsRow}>
       {stats.map((s) => (
         <TouchableOpacity key={s.label} onPress={s.onPress}
-          style={[styles.smallCard, { backgroundColor: s.cardBg }]} activeOpacity={0.8}>
+          style={[
+            styles.smallCard,
+            wellness
+              ? [glassSurface('rgba(255,255,255,0.68)'), { borderColor: 'rgba(255,255,255,0.9)' }]
+              : { backgroundColor: s.cardBg },
+          ]} activeOpacity={0.8}>
           <Ionicons name={s.icon} size={20} color={s.color} style={{ marginBottom: 6 }} />
           <Text style={[styles.smallCardValue, { color: s.color }]}>{s.value}</Text>
           <View style={[styles.smallCardBar, { backgroundColor: 'rgba(0,0,0,0.10)' }]}>
@@ -438,6 +467,7 @@ export default function HomeScreen() {
   const { colorScheme } = useThemeStore();
   const { user, profile, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
+  const wellness = isWellnessLight(colorScheme);
 
   // Steps Tracker from Zustand Authstore state
    const stepGoal  = (profile as any)?.step_goal ?? 10000;
@@ -497,9 +527,10 @@ export default function HomeScreen() {
   const onRefresh = () => { setIsRefreshing(true); loadData(); };
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
+      {wellness && <PastelScreenBackground />}
       {/* HEADER */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+      <View style={[styles.header, !wellness && { borderBottomColor: theme.border }]}>
         <View>
           <Text style={[styles.greeting, { color: theme.textSecondary }]}>{greeting} 👋</Text>
           <Text style={[styles.name, { color: theme.textPrimary }]}>{displayName}</Text>
@@ -510,7 +541,12 @@ export default function HomeScreen() {
         <View style={styles.headerRight}>
           <TouchableOpacity
             onPress={() => navigation.navigate('Notifications')}
-            style={[styles.headerIconBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            style={[
+              styles.headerIconBtn,
+              wellness
+                ? [glassSurface('rgba(255,255,255,0.75)'), { borderColor: 'rgba(255,255,255,0.9)' }]
+                : { backgroundColor: theme.card, borderColor: theme.border },
+            ]}>
             <Ionicons name="notifications-outline" size={22} color={theme.textPrimary} />
             {unreadCount > 0 && (
               <View style={[styles.badge, { backgroundColor: theme.gradStart }]}>
@@ -536,7 +572,7 @@ export default function HomeScreen() {
         {user?.id && <BurnoutBanner userId={user.id} theme={theme} />}
 
         {/* 1. Streak — fixed, always visible */}
-        <StreakRow theme={theme} streakCount={streakCount} />
+        <StreakRow theme={theme} streakCount={streakCount} wellness={wellness} />
 
         {/* 2. Carousel — slides: Calories → Macros → Water/Steps/Sleep */}
         <HeroCarousel
@@ -550,6 +586,7 @@ export default function HomeScreen() {
         <StatCards
           theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl}
           liveSteps={liveSteps} stepGoal={stepGoal} sleepHrs={sleepHrs}
+          wellness={wellness}
         />
 
         <View style={styles.sectionPad}>

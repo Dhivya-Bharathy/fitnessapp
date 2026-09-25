@@ -13,6 +13,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { useAiCoachStore } from '../../store/aiCoachStore';
+import { PastelScreenBackground, isWellnessLight, WELLNESS_GREEN } from '../../components/wellness';
 
 interface Note {
   id: string;
@@ -26,6 +27,8 @@ export default function NotesScreen() {
   const { colorScheme } = useThemeStore();
   const { user } = useAuthStore();
   const theme = colors[colorScheme];
+  const wellness = isWellnessLight(colorScheme);
+  const accent = wellness ? WELLNESS_GREEN : theme.accent;
   const coachStore = useAiCoachStore();
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -141,7 +144,8 @@ export default function NotesScreen() {
   };
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
+      {wellness && <PastelScreenBackground />}
       {/* ── HEADER ── */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -156,27 +160,27 @@ export default function NotesScreen() {
       {/* ── MAIN CONTENT ── */}
       {!selectedNote && !isEditing ? (
         <View style={styles.welcome}>
-          <View style={[styles.welcomeIconWrap, { backgroundColor: theme.accent + '15' }]}>
-            <Ionicons name="journal-outline" size={48} color={theme.accent} />
+          <View style={[styles.welcomeIconWrap, { backgroundColor: accent + '18' }]}>
+            <Ionicons name="book-outline" size={52} color={accent} />
           </View>
           <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>Your Journal</Text>
           <Text style={[styles.welcomeSub, { color: theme.textMuted }]}>
-            Write your thoughts, track your journey, and discuss entries with your AI Coach
+            Capture how you feel, reflect on progress, and talk it through with your AI coach.
           </Text>
           <View style={styles.welcomeActions}>
             <TouchableOpacity onPress={handleNewJournal} activeOpacity={0.85} style={styles.welcomeBtnWrap}>
-              <LinearGradient colors={[theme.accent, '#0DAE6C'] as [string, string]}
+              <LinearGradient colors={[accent, '#0DAE6C'] as [string, string]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.welcomeBtn}>
                 <Ionicons name="create-outline" size={20} color="#fff" />
-                <Text style={styles.welcomeBtnText}>New Journal Entry</Text>
+                <Text style={styles.welcomeBtnText}>New Entry</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => {
               coachStore.clearChat();
               navigation.navigate('Main', { screen: 'AICoach' });
-            }} activeOpacity={0.85} style={[styles.welcomeBtnOutline, { borderColor: theme.accent }]}>
-              <Ionicons name="chatbubbles-outline" size={20} color={theme.accent} />
-              <Text style={[styles.welcomeBtnOutlineText, { color: theme.accent }]}>Chat with AI Coach</Text>
+            }} activeOpacity={0.85} style={[styles.welcomeBtnOutline, { borderColor: accent }]}>
+              <Ionicons name="chatbubbles-outline" size={20} color={accent} />
+              <Text style={[styles.welcomeBtnOutlineText, { color: accent }]}>Chat with AI</Text>
             </TouchableOpacity>
           </View>
           {notes.length > 0 && (

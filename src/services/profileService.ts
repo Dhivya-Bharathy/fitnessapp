@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
-import { stripAssessmentDoneFromPrefs } from '../utils/onboardingFlags';
+import { isProfileSetupComplete, stripAssessmentDoneFromPrefs } from '../utils/onboardingFlags';
+
+const CRITICAL_PROFILE_COLUMNS = new Set(['id', 'full_name', 'calfit_id', 'goal']);
 
 function missingColumnFromError(message: string | undefined): string | null {
   if (!message) return null;
@@ -15,23 +17,40 @@ async function upsertProfileRow(
 ): Promise<{ ok: true; row: Record<string, unknown> } | { ok: false; message: string }> {
   const payload = { ...row };
   for (let attempt = 0; attempt < 16; attempt += 1) {
-    const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
-    if (!error) return { ok: true, row: payload };
+    const { error: writeError } = await supabase
+      .from('profiles')
+      .upsert(payload, { onConflict: 'id' });
 
-    if (error.code === '23505' && error.message?.includes('calfit_id') && 'calfit_id' in payload) {
+    if (!writeError) {
+      const userId = String(payload.id ?? '');
+      const { data } = userId
+        ? await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+        : { data: null };
+      return { ok: true, row: (data ?? payload) as Record<string, unknown> };
+    }
+
+    const error = writeError;
+
+    if (error?.code === '23505' && error.message?.includes('calfit_id') && 'calfit_id' in payload) {
       const base = String(payload.calfit_id ?? 'user');
       payload.calfit_id = `${base}_${Math.random().toString(36).slice(2, 6)}`.slice(0, 32);
       continue;
     }
 
-    const missing = missingColumnFromError(error.message);
+    const missing = missingColumnFromError(error?.message);
     if (missing && missing in payload) {
+      if (CRITICAL_PROFILE_COLUMNS.has(missing)) {
+        return {
+          ok: false,
+          message: `Your Supabase profiles table is missing column "${missing}". Run supabase/migrations/000_full_schema.sql in Supabase → SQL Editor, then try again.`,
+        };
+      }
       delete payload[missing];
       continue;
     }
 
-    if (__DEV__) console.error('[upsertProfileRow]', error.message);
-    return { ok: false, message: error.message || 'Could not save profile.' };
+    if (__DEV__) console.error('[upsertProfileRow]', error?.message);
+    return { ok: false, message: error?.message || 'Could not save profile.' };
   }
   return { ok: false, message: 'Could not save profile after retries.' };
 }
@@ -96,6 +115,7 @@ export interface Profile {
   created_at: string;
   updated_at: string;
   avatar_url: string | null;
+  bio?: string | null;
 }
 
 /**
@@ -131,6 +151,7 @@ export async function saveOnboardingProfile(
       onboarding_v1: {
         display_name: fields.full_name.trim(),
         username: calfit_id,
+        goal: fields.goal || null,
         height_cm: fields.height_cm,
         weight_kg: fields.current_weight_kg,
         tracking: fields.tracking_preferences,
@@ -142,14 +163,35 @@ export async function saveOnboardingProfile(
   if (!upserted.ok) {
     return {
       ok: false,
-      message: `${upserted.message} Apply supabase/migrations/000_full_schema.sql (or 002_profiles_calfit_id.sql) in Supabase → SQL.`,
+      message: upserted.message.includes('000_full_schema')
+        ? upserted.message
+        : `${upserted.message} Apply supabase/migrations/000_full_schema.sql in Supabase → SQL Editor.`,
     };
   }
 
-  return {
-    ok: true,
-    profile: { ...upserted.row, calfit_id } as Partial<Profile>,
+  const fromDb = (await getProfile(userId)) ?? (upserted.row as Profile);
+  const merged: Profile = {
+    ...(fromDb as Profile),
+    id: userId,
+    full_name: fromDb.full_name ?? fields.full_name.trim(),
+    calfit_id: fromDb.calfit_id ?? calfit_id,
+    goal: fromDb.goal ?? fields.goal ?? null,
   };
+
+  if (!isProfileSetupComplete(merged)) {
+    const missing: string[] = [];
+    if (!merged.full_name?.trim()) missing.push('display name');
+    if (!merged.calfit_id?.trim()) missing.push('username');
+    if (!merged.goal?.trim()) missing.push('goal');
+    return {
+      ok: false,
+      message:
+        `Profile saved but ${missing.join(', ')} did not persist. Sign in with Google on Welcome first, then save again. `
+        + 'If it continues, run supabase/migrations/000_full_schema.sql in Supabase → SQL Editor.',
+    };
+  }
+
+  return { ok: true, profile: merged };
 }
 
 /** Wipes profile fields so user must redo onboarding + 22 questions (works without DELETE policy). */

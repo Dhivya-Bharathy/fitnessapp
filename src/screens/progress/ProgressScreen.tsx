@@ -13,6 +13,7 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { MoodTrendChart } from '../../components/TrendCharts';
 import { exportProgressReport } from '../../utils/pdf-export';
+import { PastelScreenBackground, isWellnessLight, softCardShadow } from '../../components/wellness';
 
 const { width: SW } = Dimensions.get('window');
 const PINK   = '#FF6B9D';
@@ -194,6 +195,7 @@ export default function ProgressScreen() {
   const { colorScheme } = useThemeStore();
   const { user, profile, liveSteps } = useAuthStore();
   const theme = colors[colorScheme];
+  const wellness = isWellnessLight(colorScheme);
 
   // Read streak directly from profile in authStore — always current, no DB round-trip needed
   const streakCount = (profile as any)?.streak_count ?? 0;
@@ -231,7 +233,8 @@ export default function ProgressScreen() {
     : 0;
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
+      {wellness && <PastelScreenBackground />}
       <LinearGradient
         colors={[PURPLE + 'DD', PINK + 'CC'] as [string, string]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -277,7 +280,7 @@ export default function ProgressScreen() {
         {data?.weight && (
           <>
             <SectionHeader title="Weight" icon="body-outline" color={PINK} theme={theme} />
-            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+            <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
               <View style={styles.weightRow}>
                 <View>
                   <Text style={[styles.weightVal, { color: theme.textPrimary }]}>{data.weight} kg</Text>
@@ -315,7 +318,7 @@ export default function ProgressScreen() {
         {data?.chartDays && data.chartDays.length > 0 && (
           <>
             <SectionHeader title="Calorie Trend" icon="flame-outline" color={ORANGE} theme={theme} />
-            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+            <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
               <View style={styles.chartLegend}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: GREEN }]} />
@@ -390,7 +393,7 @@ export default function ProgressScreen() {
               title="Recent Workouts" icon="barbell-outline" color={PINK} theme={theme}
               onPress={() => navigation.navigate('Main' as never, { screen: 'Activity' } as never)}
             />
-            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+            <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
               {data.recentWorkouts.map((w: any, i: number) => (
                 <View key={i} style={[styles.workoutRow, i < data.recentWorkouts.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
                   <View style={[styles.workoutIcon, { backgroundColor: PINK + '18' }]}>
@@ -416,7 +419,7 @@ export default function ProgressScreen() {
           actionLabel="Log"
         />
         {data?.latestMeasurement ? (
-          <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+          <View style={[styles.card, wellness ? { backgroundColor: 'rgba(255,255,255,0.88)', borderColor: 'rgba(255,255,255,0.95)', marginHorizontal: spacing.lg, ...softCardShadow() } : { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
             <Text style={[styles.measDate, { color: theme.textMuted }]}>
               Last logged: {data.latestMeasurement.measured_at?.split('T')[0]}
             </Text>

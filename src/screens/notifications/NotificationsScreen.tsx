@@ -11,6 +11,12 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
+import {
+  PastelScreenBackground,
+  SegmentChips,
+  isWellnessLight,
+  softCardShadow,
+} from '../../components/wellness';
 
 const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';
@@ -68,7 +74,7 @@ function NotifCard({
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: () => onDelete(notif.id) },
       ])}
-      style={[styles.card, {
+      style={[styles.card, softCardShadow(), {
         backgroundColor: notif.read ? theme.card : theme.accentDim as string,
         borderColor: notif.read ? theme.border : theme.accent + '40',
         borderWidth: notif.read ? 1 : 1.5,
@@ -122,7 +128,12 @@ export default function NotificationsScreen() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(60);
-    setNotifications((data ?? []) as Notification[]);
+    setNotifications(
+      (data ?? []).map((row: any) => ({
+        ...row,
+        message: row.body ?? row.message ?? '',
+      })) as Notification[],
+    );
   };
 
   const refresh = async () => { setIsRefreshing(true); await load(); setIsRefreshing(false); };
@@ -179,9 +190,11 @@ export default function NotificationsScreen() {
   });
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const wellness = isWellnessLight(colorScheme);
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
+      {wellness && <PastelScreenBackground />}
 
       {/* ── GRADIENT HEADER ── */}
       <LinearGradient
@@ -206,26 +219,12 @@ export default function NotificationsScreen() {
       </LinearGradient>
 
       {/* ── FILTER TABS ── */}
-      <View style={[styles.tabRow, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={TABS}
-          keyExtractor={t => t}
-          contentContainerStyle={styles.tabList}
-          renderItem={({ item: tab }) => (
-            <TouchableOpacity
-              onPress={() => setActiveTab(tab)}
-              style={[styles.tab, activeTab === tab && { backgroundColor: TAB_COLORS[tab], borderColor: TAB_COLORS[tab] },
-                { borderColor: activeTab === tab ? TAB_COLORS[tab] : theme.border }]}
-            >
-              <Text style={[styles.tabText, { color: activeTab === tab ? '#fff' : theme.textMuted }]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
+      <SegmentChips
+        tabs={TABS.map((t) => ({ id: t, label: t, color: TAB_COLORS[t] }))}
+        active={activeTab}
+        onChange={setActiveTab}
+        theme={theme}
+      />
 
       {/* ── NOTIFICATION LIST ── */}
       <FlatList

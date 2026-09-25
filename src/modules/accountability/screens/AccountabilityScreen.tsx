@@ -15,6 +15,7 @@ import { PartnerInviteSheet } from '../components/PartnerInviteSheet';
 import { EmptyState } from '../../shared/EmptyState';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { usePartner } from '../hooks/usePartner';
+import { PastelScreenBackground, isWellnessLight } from '../../../components/wellness';
 // ── SAFE COLORS ───────────────────────────────────────────────
 const BLUE   = '#6699FF';
 const PURPLE = '#B280FF';
@@ -233,6 +234,7 @@ export default function AccountabilityScreen() {
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
+  const wellness = isWellnessLight(colorScheme);
 
   const [showInvite, setShowInvite]     = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -306,7 +308,8 @@ export default function AccountabilityScreen() {
   }, [safePartners, user]);
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
+      {wellness && <PastelScreenBackground />}
 
       {/* ── GRADIENT HEADER ── */}
       <LinearGradient

@@ -110,24 +110,38 @@ export default function EditProfileScreen() {
   };
 
   const handleChangePhoto = async () => {
-    const uri = await pickImageFromGallery();
-    if (!uri) return;
-    setAvatarUri(uri);
+    if (!user?.id) {
+      const { showUserMessage } = await import('../../utils/userMessages');
+      showUserMessage('Sign in required', 'Sign in with Google, then set your profile photo.');
+      return;
+    }
+    const picked = await pickImageFromGallery();
+    if (!picked) return;
+    setAvatarUri(picked.uri);
     setIsUploadingPhoto(true);
     try {
       const { uploadAvatarToSupabase } = await import('../../services/imageService');
-      const publicUrl = await uploadAvatarToSupabase(uri, user?.id ?? '');
-      if (publicUrl) {
-        setAvatarUri(publicUrl);
-        const { supabase } = await import('../../services/supabase');
-        await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user?.id);
-        updateProfile({ avatar_url: publicUrl });
-      } else {
-        Alert.alert('Upload Failed', 'Could not upload your photo.');
+      const { showUserMessage, showSaveSuccess } = await import('../../utils/userMessages');
+      const { updateProfileAdaptive } = await import('../../services/profileService');
+      const { url: publicUrl, error: uploadError } = await uploadAvatarToSupabase(user.id, picked);
+      if (!publicUrl) {
+        showUserMessage('Photo upload failed', uploadError ?? 'Could not upload your photo.');
         setAvatarUri(profile?.avatar_url ?? null);
+        return;
       }
-    } catch {
-      Alert.alert('Error', 'Photo upload failed.');
+      setAvatarUri(publicUrl);
+      const storedUrl = publicUrl.split('?')[0];
+      const saved = await updateProfileAdaptive(user.id, { avatar_url: storedUrl });
+      if (!saved.ok) {
+        showUserMessage('Photo uploaded but not saved', saved.message ?? 'Could not save avatar_url on profile.');
+        return;
+      }
+      updateProfile({ avatar_url: storedUrl });
+      showSaveSuccess('Your profile photo was updated.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Photo upload failed.';
+      const { showUserMessage } = await import('../../utils/userMessages');
+      showUserMessage('Error', msg);
       setAvatarUri(profile?.avatar_url ?? null);
     } finally { setIsUploadingPhoto(false); }
   };
@@ -142,8 +156,9 @@ export default function EditProfileScreen() {
     }
     setIsSaving(true);
     try {
-      const { supabase } = await import('../../services/supabase');
-      const updates: Record<string, any> = {
+      const { updateProfileAdaptive } = await import('../../services/profileService');
+      const { showSaveSuccess, showUserMessage } = await import('../../utils/userMessages');
+      const result = await updateProfileAdaptive(user.id, {
         full_name: fullName.trim(),
         calfit_id,
         bio: bio.trim() || null,
@@ -153,15 +168,18 @@ export default function EditProfileScreen() {
         current_weight_kg: weightKg || null,
         target_weight_kg: targetWeightKg || null,
         height_cm: heightCm || null,
-      };
-      const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
-      if (error) throw error;
-      updateProfile(updates);
-      Alert.alert('Saved \u2713', 'Your profile has been updated.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Could not save profile.');
+      });
+      if (!result.ok) {
+        showUserMessage('Could not save profile', result.message ?? 'Try again.');
+        return;
+      }
+      updateProfile(result.applied ?? {});
+      showSaveSuccess('Your profile has been updated.');
+      navigation.goBack();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Could not save profile.';
+      const { showUserMessage } = await import('../../utils/userMessages');
+      showUserMessage('Error', msg);
     } finally { setIsSaving(false); }
   };
 

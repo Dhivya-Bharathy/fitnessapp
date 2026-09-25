@@ -52,7 +52,11 @@ import MealPlanScreen from '../screens/meals/MealPlanScreen';
 
 // ── AI FOOD SCANNER ───────────────────────────────────────────
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
-import { isFitnessAssessmentComplete, getLocalAssessmentComplete } from '../utils/onboardingFlags';
+import {
+  isFitnessAssessmentComplete,
+  getLocalAssessmentComplete,
+  isProfileSetupComplete,
+} from '../utils/onboardingFlags';
 
 // ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
@@ -265,12 +269,12 @@ function AuthStack() {
 
   const initialRoute = useMemo(() => {
     if (!user) return 'Welcome';
-    if (!profile?.goal) return 'Onboarding';
+    if (!isProfileSetupComplete(profile)) return 'Onboarding';
     const assessmentDone =
       isFitnessAssessmentComplete(profile) || assessmentDoneLocal;
     if (!assessmentDone) return 'FitnessAssessment';
-    return 'Onboarding';
-  }, [user, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal]);
+    return 'Welcome';
+  }, [user, profile, profile?.tracking_preferences, assessmentDoneLocal]);
 
   return (
     <RootStack.Navigator

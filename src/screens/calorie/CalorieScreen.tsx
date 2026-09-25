@@ -15,6 +15,12 @@ import { supabase } from '../../services/supabase';
 import { searchFoods } from '../../services/foodSearchService';
 import { lookupFoodNutrition, suggestRecipes } from '../../services/nvidia-client';
 import { CalorieTrendChart } from '../../components/TrendCharts';
+import {
+  PastelScreenBackground,
+  SegmentChips,
+  isWellnessLight,
+  WELLNESS_GREEN,
+} from '../../components/wellness';
 
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -491,6 +497,8 @@ export default function CalorieScreen() {
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
+  const wellness = isWellnessLight(colorScheme);
+  const trackAccent = wellness ? WELLNESS_GREEN : theme.accent;
 
   const [activeView, setActiveView]             = useState<'tracker' | 'mealplan'>('tracker');
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
@@ -561,7 +569,8 @@ export default function CalorieScreen() {
   ];
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView backgroundColor={wellness ? 'transparent' : theme.bg} style={styles.safe}>
+      {wellness && <PastelScreenBackground />}
       <View style={styles.header}>
         <View>
           <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Calorie Tracker</Text>
@@ -587,31 +596,16 @@ export default function CalorieScreen() {
         </View>
       </View>
 
-      {/* View toggle */}
-      <View style={[styles.viewToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        {(['tracker', 'mealplan'] as const).map((v) => {
-          const isActive = activeView === v;
-          return (
-            <TouchableOpacity
-              key={v}
-              onPress={() => setActiveView(v)}
-              style={[styles.viewToggleTab, isActive && { backgroundColor: theme.accent }]}
-            >
-              <Ionicons
-                name={v === 'tracker' ? 'nutrition-outline' : 'restaurant-outline'}
-                size={15}
-                color={isActive ? '#fff' : theme.textMuted}
-              />
-              <Text style={[styles.viewToggleText, {
-                color: isActive ? '#fff' : theme.textMuted,
-                fontWeight: isActive ? '700' : '500',
-              }]}>
-                {v === 'tracker' ? 'Tracker' : 'Meal Plan'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <SegmentChips
+        variant="segmented"
+        tabs={[
+          { id: 'tracker' as const, label: 'Tracker', icon: 'nutrition-outline', color: trackAccent },
+          { id: 'mealplan' as const, label: 'Meal Plan', icon: 'restaurant-outline', color: trackAccent },
+        ]}
+        active={activeView}
+        onChange={setActiveView}
+        theme={theme}
+      />
 
       {activeView === 'tracker' ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
   StyleSheet, TextInput, Keyboard, Platform, FlatList, Animated,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,14 +20,25 @@ import { FitnessProfileModal } from '../components/FitnessProfileModal';
 import { ChatBubble } from '../components/ChatBubble';
 import { VoiceMicButton } from '../components/VoicemicButton';
 import type { FitnessLevel, FitnessGoal, Equipment, GeneratedWorkout } from '../types/ai-coach.types';
+import {
+  PastelScreenBackground,
+  SegmentChips,
+  isWellnessLight,
+  glassSurface,
+  WELLNESS_GREEN,
+} from '../components/wellness';
 
 type Tab = 'generate' | 'saved' | 'chat';
 
-const SUGGESTIONS = [
-  'Create a 30-min full body workout',
-  'Give me a high-protein meal plan',
-  'How do I improve my squat form?',
-  'Tips for staying motivated',
+const QUICK_TOPICS: { label: string; prompt: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { label: 'Workout', prompt: 'Suggest a balanced workout for today based on my goals.', icon: 'barbell-outline' },
+  { label: 'Meal', prompt: 'Help me plan high-protein meals for the rest of today.', icon: 'restaurant-outline' },
+  { label: 'Tips', prompt: 'Give me 3 practical tips to stay consistent this week.', icon: 'bulb-outline' },
+];
+
+const FOLLOW_UP_PROMPTS = [
+  '30-min full body workout',
+  'High-protein dinner ideas',
 ];
 
 const TAB_ICONS: Record<Tab, keyof typeof Ionicons.glyphMap> = {
@@ -40,6 +52,7 @@ export default function AICoachScreen() {
   const insets = useSafeAreaInsets();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
+  const wellness = isWellnessLight(colorScheme);
   const { user } = useAuthStore();
   const store = useAiCoachStore();
   const [activeTab, setActiveTab] = useState<Tab>('chat');
@@ -116,57 +129,69 @@ export default function AICoachScreen() {
     setTimeout(() => handleSendChat(text), 100);
   };
 
-  const renderTabBar = () => (
-    <View style={[styles.tabBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      {(['generate', 'saved', 'chat'] as Tab[]).map((tab) => {
-        const isActive = activeTab === tab;
-        return (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            activeOpacity={0.7}
-            style={[styles.tabItem, isActive && { backgroundColor: theme.accent }]}
-          >
-            <Ionicons
-              name={TAB_ICONS[tab]}
-              size={16}
-              color={isActive ? '#fff' : theme.textMuted}
-            />
-            <Text style={[styles.tabLabel, {
-              color: isActive ? '#fff' : theme.textMuted,
-              fontWeight: isActive ? '700' : '500',
-            }]}>
-              {tab === 'generate' ? 'Generate' : tab === 'saved' ? 'Saved' : 'Chat'}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+  const accent = wellness ? WELLNESS_GREEN : theme.accent;
+  const showBack = navigation.canGoBack();
+
+  const renderQuickTopics = (compact?: boolean) => (
+    <View style={[styles.quickTopicRow, compact && styles.quickTopicRowCompact]}>
+      {QUICK_TOPICS.map((topic) => (
+        <TouchableOpacity
+          key={topic.label}
+          onPress={() => handleSuggestionTap(topic.prompt)}
+          activeOpacity={0.85}
+          style={[
+            styles.quickTopicChip,
+            wellness
+              ? [glassSurface('rgba(255,255,255,0.9)'), { borderColor: 'rgba(255,255,255,0.95)' }]
+              : { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <View style={[styles.quickTopicIcon, { backgroundColor: accent + '18' }]}>
+            <Ionicons name={topic.icon} size={18} color={accent} />
+          </View>
+          <Text style={[styles.quickTopicText, { color: theme.textPrimary }]}>{topic.label}</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 
   const renderEmptyChat = () => (
-    <View style={styles.chatEmpty}>
-      <View style={[styles.chatEmptyIconWrap, { backgroundColor: theme.accent + '18' }]}>
-        <Ionicons name="chatbubbles-outline" size={40} color={theme.accent} />
+    <ScrollView
+      contentContainerStyle={styles.chatEmptyScroll}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={[styles.chatEmptyIconWrap, { backgroundColor: accent + '15' }]}>
+        <Ionicons name="sparkles" size={36} color={accent} />
       </View>
-      <Text style={[styles.chatEmptyTitle, { color: theme.textPrimary }]}>Your AI Fitness Coach</Text>
+      <Text style={[styles.chatEmptyTitle, { color: theme.textPrimary }]}>Hi! I&apos;m your coach</Text>
       <Text style={[styles.chatEmptySub, { color: theme.textSecondary }]}>
-        Ask anything about workouts, nutrition, or motivation
+        Pick a topic below or type a question — workouts, meals, and habits.
       </Text>
-      <View style={styles.suggestions}>
-        {SUGGESTIONS.map(s => (
+
+      {renderQuickTopics()}
+
+      <Text style={[styles.tryLabel, { color: theme.textMuted }]}>Try asking</Text>
+      <View style={styles.followUpRow}>
+        {FOLLOW_UP_PROMPTS.map((s) => (
           <TouchableOpacity
             key={s}
             onPress={() => handleSuggestionTap(s)}
-            activeOpacity={0.7}
-            style={[styles.suggestionChip, { backgroundColor: theme.card, borderColor: theme.border }]}
+            activeOpacity={0.85}
+            style={[
+              styles.followUpChip,
+              wellness
+                ? [glassSurface('rgba(255,255,255,0.85)'), { borderColor: 'rgba(255,255,255,0.9)' }]
+                : { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
           >
-            <Ionicons name="sparkles" size={12} color={theme.accent} style={{ marginRight: 4 }} />
-            <Text style={[styles.suggestionText, { color: theme.textSecondary }]}>{s}</Text>
+            <Text style={[styles.followUpText, { color: theme.textSecondary }]} numberOfLines={2}>
+              {s}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
-    </View>
+    </ScrollView>
   );
 
   function ThinkingBubble({ theme, startedAt }: { theme: typeof colors.light; startedAt: number | null }) {
@@ -210,19 +235,29 @@ export default function AICoachScreen() {
   }
 
   const renderChat = () => (
-    <View style={styles.chatContainer}>
-      {store.chatMessages.length === 0 && !store.isChatLoading ? renderEmptyChat() : (
+    <KeyboardAvoidingView
+      style={styles.chatContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 72 : 0}
+    >
+      {store.chatMessages.length === 0 && !store.isChatLoading ? (
+        renderEmptyChat()
+      ) : (
         <>
           {store.chatMessages.length > 0 && (
             <View style={[styles.chatActions, { borderBottomColor: theme.border }]}>
-              <TouchableOpacity onPress={() => user && store.clearChat(user.id)} style={[styles.clearChatBtn, { backgroundColor: theme.red + '12' }]}>
+              <TouchableOpacity
+                onPress={() => user && store.clearChat(user.id)}
+                style={[styles.clearChatBtn, { backgroundColor: theme.red + '12' }]}
+              >
                 <Ionicons name="trash-outline" size={13} color={theme.red} />
-                <Text style={[styles.clearChatText, { color: theme.red }]}>Clear</Text>
+                <Text style={[styles.clearChatText, { color: theme.red }]}>Clear chat</Text>
               </TouchableOpacity>
             </View>
           )}
           <FlatList
             ref={flatListRef}
+            style={styles.chatListFlex}
             data={[
               ...store.chatMessages,
               ...(store.isChatLoading ? [{ id: '__thinking__', role: 'assistant' as const, content: '', timestamp: 0 }] : []),
@@ -239,20 +274,36 @@ export default function AICoachScreen() {
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
+          {renderQuickTopics(true)}
         </>
       )}
 
-      <View style={[
-        styles.chatInputBar,
-        { backgroundColor: theme.card, borderTopColor: theme.border, paddingBottom: Math.max(keyboardHeight, Platform.OS === 'ios' ? 20 : spacing.sm) },
-      ]}>
-        <View style={[styles.chatInputWrap, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-          <VoiceMicButton theme={theme} onTranscribed={handleVoiceTranscribed} size={34} />
+      <View
+        style={[
+          styles.chatInputBar,
+          {
+            paddingBottom: Math.max(
+              keyboardHeight > 0 ? spacing.sm : spacing.md,
+              Platform.OS === 'ios' ? insets.bottom : spacing.sm,
+            ),
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.chatInputWrap,
+            wellness
+              ? [glassSurface('rgba(255,255,255,0.94)'), { borderColor: 'rgba(255,255,255,0.95)' }]
+              : { backgroundColor: theme.bg, borderColor: theme.border },
+          ]}
+        >
+          <VoiceMicButton theme={theme} onTranscribed={handleVoiceTranscribed} size={36} />
           <TextInput
             value={chatInput}
             onChangeText={setChatInput}
-            placeholder="Ask your coach..."
+            placeholder="Message your coach…"
             placeholderTextColor={theme.textMuted}
             style={[styles.chatInput, { color: theme.textPrimary }]}
             multiline
@@ -264,13 +315,20 @@ export default function AICoachScreen() {
           <TouchableOpacity
             onPress={() => handleSendChat()}
             disabled={!chatInput.trim() || store.isChatLoading}
-            style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? theme.accent : theme.border + '80' }]}
+            activeOpacity={0.85}
+            style={[
+              styles.sendBtn,
+              {
+                backgroundColor: chatInput.trim() ? accent : theme.border,
+                opacity: chatInput.trim() ? 1 : 0.5,
+              },
+            ]}
           >
-            <Ionicons name="arrow-up" size={16} color={chatInput.trim() ? '#fff' : theme.textMuted} />
+            <Ionicons name="arrow-up" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   const renderGenerateContent = () => {
@@ -384,43 +442,57 @@ export default function AICoachScreen() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: wellness ? 'transparent' : theme.bg, paddingTop: insets.top }]}>
+      {wellness && <PastelScreenBackground />}
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={[styles.backBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-          >
-            <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
-          </TouchableOpacity>
-          <View>
+          {showBack ? (
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[
+                styles.backBtn,
+                wellness
+                  ? [glassSurface('rgba(255,255,255,0.8)'), { borderColor: 'rgba(255,255,255,0.9)' }]
+                  : { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+          <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>AI Coach</Text>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-              {activeTab === 'chat' ? 'Your fitness assistant' : 'Generate personalized workouts'}
+            <Text style={[styles.subtitle, { color: theme.textMuted }]} numberOfLines={1}>
+              {activeTab === 'chat' ? 'Chat · workouts & nutrition' : activeTab === 'saved' ? 'Saved workouts' : 'Build a workout'}
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Analysis')}
-            hitSlop={12}
-            style={[styles.profileBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-          >
-            <Ionicons name="analytics-outline" size={20} color={theme.accent} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowProfile(true)}
-            hitSlop={12}
-            style={[styles.profileBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-          >
-            <Ionicons name="person-outline" size={20} color={theme.textPrimary} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => setShowProfile(true)}
+          hitSlop={12}
+          style={[
+            styles.profileBtn,
+            wellness
+              ? [glassSurface('rgba(255,255,255,0.8)'), { borderColor: 'rgba(255,255,255,0.9)' }]
+              : { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <Ionicons name="options-outline" size={20} color={theme.textPrimary} />
+        </TouchableOpacity>
       </View>
 
-      {renderTabBar()}
+      <SegmentChips
+        variant="segmented"
+        tabs={[
+          { id: 'generate' as Tab, label: 'Generate', icon: TAB_ICONS.generate, color: accent },
+          { id: 'saved' as Tab, label: 'Saved', icon: TAB_ICONS.saved, color: accent },
+          { id: 'chat' as Tab, label: 'Chat', icon: TAB_ICONS.chat, color: accent },
+        ]}
+        active={activeTab}
+        onChange={setActiveTab}
+        theme={theme}
+      />
 
       <View style={styles.content}>
         {activeTab === 'generate' && renderGenerateContent()}
@@ -454,18 +526,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: fontSize.sm, marginTop: 2 },
   profileBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Segmented tab bar
-  tabBar: {
-    flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    borderRadius: 12, padding: 3, borderWidth: 1,
-  },
-  tabItem: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 8, borderRadius: 10,
-  },
-  tabLabel: { fontSize: fontSize.sm },
-
-  content: { flex: 1 },
+  content: { flex: 1, paddingBottom: 88 },
 
   // Generate tab
   scroll: { flex: 1 },
@@ -504,21 +565,121 @@ const styles = StyleSheet.create({
 
   // Chat styles
   chatContainer: { flex: 1 },
-  chatList: { paddingTop: spacing.xs, paddingBottom: spacing.sm },
+  chatListFlex: { flex: 1 },
+  chatList: { paddingTop: spacing.xs, paddingBottom: spacing.md, flexGrow: 1 },
   chatActions: { flexDirection: 'row', justifyContent: 'center', paddingVertical: spacing.xs, borderBottomWidth: 0.5 },
   clearChatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
   clearChatText: { fontSize: fontSize.xs, fontWeight: '600' },
-  chatEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl, paddingBottom: 60 },
-  chatEmptyIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  chatEmptyTitle: { fontSize: fontSize.xxl, fontWeight: '800', textAlign: 'center', marginBottom: spacing.xs },
-  chatEmptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20, marginBottom: spacing.xl, paddingHorizontal: spacing.lg },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center', paddingHorizontal: spacing.md },
-  suggestionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
-  suggestionText: { fontSize: fontSize.base, fontWeight: '500' },
-  chatInputBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  chatInputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.xl, borderWidth: 1, paddingLeft: spacing.xs, gap: 2 },
-  chatInput: { flex: 1, paddingVertical: spacing.sm, maxHeight: 100, fontSize: fontSize.base, paddingLeft: spacing.xs },
-  sendBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', margin: 3 },
+  chatEmptyScroll: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+  },
+  chatEmptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  chatEmptyTitle: { fontSize: fontSize.xl + 2, fontWeight: '800', textAlign: 'center', marginBottom: spacing.xs },
+  chatEmptySub: {
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+    maxWidth: 300,
+  },
+  tryLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    alignSelf: 'stretch',
+    textAlign: 'center',
+  },
+  followUpRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  followUpChip: {
+    flex: 1,
+    maxWidth: 168,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  followUpText: { fontSize: fontSize.sm, fontWeight: '500', textAlign: 'center', lineHeight: 18 },
+  quickTopicRow: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  quickTopicRowCompact: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  quickTopicChip: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.lg,
+    minWidth: 96,
+    maxWidth: 120,
+    flexShrink: 0,
+  },
+  quickTopicIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickTopicText: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'center' },
+  chatInputBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, flexShrink: 0 },
+  chatInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingLeft: spacing.xs,
+    paddingRight: spacing.xs,
+    paddingVertical: 6,
+    gap: 4,
+    minHeight: 48,
+  },
+  chatInput: {
+    flex: 1,
+    paddingVertical: Platform.OS === 'web' ? 10 : spacing.sm,
+    maxHeight: 100,
+    fontSize: fontSize.base,
+    paddingHorizontal: spacing.xs,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
   thinkingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginBottom: spacing.md },
   thinkingBubble: { maxWidth: '78%', paddingHorizontal: spacing.md, paddingVertical: 12, borderRadius: radius.lg, borderBottomLeftRadius: 4, borderWidth: 1, gap: 6 },
   thinkingDots: { flexDirection: 'row', gap: 5, marginBottom: 4 },

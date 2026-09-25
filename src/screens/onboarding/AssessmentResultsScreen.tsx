@@ -1,10 +1,8 @@
 import { useEffect, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
 import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
-import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
+import { PlanGenerationLoader } from '../../components/onboarding/PlanGenerationLoader';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '../../store/themeStore';
@@ -119,15 +117,9 @@ export default function AssessmentResultsScreen() {
 
   if (isGenerating || !result) {
     return (
-      <AndroidSafeView backgroundColor={theme.bg} style={styles.center}>
-        <ActivityIndicator size="large" color={theme.accent} />
-        <Text style={[styles.loadingTitle, { color: theme.textPrimary }]}>
-          Building your plan…
-        </Text>
-        <Text style={[styles.loadingSub, { color: theme.textSecondary }]}>
-          Reading your {countAnsweredQuestions(useAssessmentStore.getState().answers)} answers → OpenAI
-        </Text>
-      </AndroidSafeView>
+      <PlanGenerationLoader
+        answerCount={countAnsweredQuestions(useAssessmentStore.getState().answers)}
+      />
     );
   }
 

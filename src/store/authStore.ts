@@ -93,11 +93,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     set({ session, user: session.user, isAuthenticated: true });
 
-    if (!get().isOnboarding) {
-      get().loadProfile(session.user.id).catch((e) => {
-        if (__DEV__) console.error(e);
-      });
-    }
+    get().loadProfile(session.user.id).catch((e) => {
+      if (__DEV__) console.error(e);
+    });
   },
 
   loadProfile: async (userId: string) => {
@@ -111,8 +109,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const { isAssessmentCompleteForUser } = await import('../utils/onboardingFlags');
       const force = get().forceAssessmentRetake;
+      const { isProfileSetupComplete } = await import('../utils/onboardingFlags');
       const complete = await isAssessmentCompleteForUser(userId, profile, { forceRetake: force });
-      const showFlow = !get().user || force || !profile?.goal || !complete;
+      const profileReady = isProfileSetupComplete(profile);
+      const showFlow = !get().user || force || !profileReady || !complete;
       set({ isOnboarding: showFlow });
 
       return profile;
