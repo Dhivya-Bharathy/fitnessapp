@@ -9,11 +9,6 @@ export function PremiumAtmosphereBackground() {
         colors={['#050608', '#0A1218', '#050608']}
         style={StyleSheet.absoluteFill}
       />
-      <LinearGradient
-        colors={['transparent', 'rgba(5,8,10,0.5)', '#050608']}
-        locations={[0, 0.45, 1]}
-        style={styles.bottomVignette}
-      />
       <View style={styles.nebulaTop} />
       <View style={styles.nebulaLeft} />
       {Platform.OS === 'web' && (
@@ -51,12 +46,5 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     backgroundColor: 'rgba(178,128,255,0.03)',
-  },
-  bottomVignette: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 180,
   },
 });
