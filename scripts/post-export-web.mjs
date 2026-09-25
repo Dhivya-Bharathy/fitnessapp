@@ -35,29 +35,49 @@ function copyDir(src, dest) {
 
 copyDir(publicDir, dist);
 
+function jpegDimensions(filePath) {
+  const b = fs.readFileSync(filePath);
+  for (let j = 2; j < b.length - 8; j++) {
+    if (b[j] === 0xff && (b[j + 1] === 0xc0 || b[j + 1] === 0xc2)) {
+      return { height: b.readUInt16BE(j + 5), width: b.readUInt16BE(j + 7) };
+    }
+  }
+  return { width: 1200, height: 630 };
+}
+
+const ogPath = path.join(dist, 'og-image.jpg');
+const dims = fs.existsSync(ogPath) ? jpegDimensions(ogPath) : { width: 1200, height: 630 };
+
 const indexPath = path.join(dist, 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 
 const ogImage = siteUrl ? `${siteUrl}/og-image.jpg` : '/og-image.jpg';
 const ogUrl = siteUrl ? `${siteUrl}/` : '/';
+const ogTitle = 'Fitness App — Your AI Health Companion';
 
 const previewMeta = `
     <meta name="description" content="Your AI Health Companion — track, scan, plan, and get AI guidance." />
+    <meta property="og:site_name" content="Fitness App" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${ogUrl}" />
-    <meta property="og:title" content="Fitness App — Your AI Health Companion" />
+    <meta property="og:title" content="${ogTitle}" />
     <meta property="og:description" content="Track • Scan • Plan • Get AI Guidance • Stay Healthy" />
     <meta property="og:image" content="${ogImage}" />
+    <meta property="og:image:url" content="${ogImage}" />
     <meta property="og:image:secure_url" content="${ogImage}" />
     <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="${dims.width}" />
+    <meta property="og:image:height" content="${dims.height}" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Fitness App — Your AI Health Companion" />
+    <meta name="twitter:title" content="${ogTitle}" />
     <meta name="twitter:description" content="Track • Scan • Plan • Get AI Guidance • Stay Healthy" />
     <meta name="twitter:image" content="${ogImage}" />
+    <link rel="image_src" href="${ogImage}" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="/favicon.png" type="image/png" />
 `;
 
+html = html.replace(/<title>[^<]*<\/title>/i, `<title>${ogTitle}</title>`);
 html = html.replace(/<meta name="description"[^>]*>/i, '');
 html = html.replace(/<link rel="icon"[^>]*>/gi, '');
 html = html.replace('</head>', `${previewMeta}\n  </head>`);
