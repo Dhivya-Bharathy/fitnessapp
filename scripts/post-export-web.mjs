@@ -60,24 +60,26 @@ const ogImage = siteUrl ? `${siteUrl}/og-image.jpg` : '/og-image.jpg';
 const ogUrl = siteUrl ? `${siteUrl}/` : '/';
 const ogTitle = 'Fitness App — Your AI Health Companion';
 
+// WhatsApp reads OG tags from early in <head> (see Meta link preview docs).
 const previewMeta = `
-    <meta name="description" content="Your AI Health Companion — track, scan, plan, and get AI guidance." />
-    <meta property="og:site_name" content="Fitness App" />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="${ogUrl}" />
-    <meta property="og:title" content="${ogTitle}" />
-    <meta property="og:description" content="Track • Scan • Plan • Get AI Guidance • Stay Healthy" />
     <meta property="og:image" content="${ogImage}" />
     <meta property="og:image:url" content="${ogImage}" />
     <meta property="og:image:secure_url" content="${ogImage}" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="${OG_W}" />
     <meta property="og:image:height" content="${OG_H}" />
+    <meta property="og:title" content="${ogTitle}" />
+    <meta property="og:description" content="Track • Scan • Plan • Get AI Guidance • Stay Healthy" />
+    <meta property="og:url" content="${ogUrl}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Fitness App" />
+    <meta name="description" content="Your AI Health Companion — track, scan, plan, and get AI guidance." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="${ogImage}" />
     <meta name="twitter:title" content="${ogTitle}" />
     <meta name="twitter:description" content="Track • Scan • Plan • Get AI Guidance • Stay Healthy" />
-    <meta name="twitter:image" content="${ogImage}" />
     <link rel="image_src" href="${ogImage}" />
+    <link rel="preload" as="image" href="${ogImage}" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="/favicon.png" type="image/png" />
 `;
@@ -85,7 +87,10 @@ const previewMeta = `
 html = html.replace(/<title>[^<]*<\/title>/i, `<title>${ogTitle}</title>`);
 html = html.replace(/<meta name="description"[^>]*>/i, '');
 html = html.replace(/<link rel="icon"[^>]*>/gi, '');
-html = html.replace('</head>', `${previewMeta}\n  </head>`);
+html = html.replace(
+  /<head>\s*\n/i,
+  `<head>\n${previewMeta}\n`,
+);
 
 fs.writeFileSync(indexPath, html);
 console.log('post-export-web: copied public/ → dist/, injected link preview meta');
