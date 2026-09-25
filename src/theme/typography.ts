@@ -1,10 +1,22 @@
-export const fontFamily = {
-  regular: 'PlusJakartaSans_400Regular',
-  medium: 'PlusJakartaSans_500Medium',
-  semiBold: 'PlusJakartaSans_600SemiBold',
-  bold: 'PlusJakartaSans_700Bold',
-  extraBold: 'PlusJakartaSans_800ExtraBold',
-};
+import { Platform } from 'react-native';
+
+/** Web loads Plus Jakarta via Google Fonts CSS (see App.tsx); native uses expo-google-fonts files. */
+export const fontFamily = Platform.select({
+  web: {
+    regular: 'Plus Jakarta Sans',
+    medium: 'Plus Jakarta Sans',
+    semiBold: 'Plus Jakarta Sans',
+    bold: 'Plus Jakarta Sans',
+    extraBold: 'Plus Jakarta Sans',
+  },
+  default: {
+    regular: 'PlusJakartaSans_400Regular',
+    medium: 'PlusJakartaSans_500Medium',
+    semiBold: 'PlusJakartaSans_600SemiBold',
+    bold: 'PlusJakartaSans_700Bold',
+    extraBold: 'PlusJakartaSans_800ExtraBold',
+  },
+})!;
 
 export const fontSize = {
   xs: 10,

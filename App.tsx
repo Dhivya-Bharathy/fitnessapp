@@ -15,30 +15,58 @@ import { setupNotificationHandler } from './src/services/reminderService';
 
 if (Platform.OS !== 'web') setupNotificationHandler();
 
+const AUTH_BOOT_TIMEOUT_MS = 12_000;
+const WEB_FONT_GATE_MS = 800;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
+
 export default function App() {
-  const { setSession, user, loadProfile } = useAuthStore();
+  const { setSession, loadProfile } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
-  const [fontTimeout, setFontTimeout] = useState(false);
+  const [fontTimeout, setFontTimeout] = useState(Platform.OS === 'web');
 
-  const [fontsLoaded, fontsError] = useFonts({
-    PlusJakartaSans_400Regular, PlusJakartaSans_500Medium,
-    PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold,
-    ...(Platform.OS !== 'web' ? Ionicons.font : {}),
-  });
+  const [fontsLoaded, fontsError] = useFonts(
+    Platform.OS === 'web'
+      ? {}
+      : {
+          PlusJakartaSans_400Regular,
+          PlusJakartaSans_500Medium,
+          PlusJakartaSans_600SemiBold,
+          PlusJakartaSans_700Bold,
+          PlusJakartaSans_800ExtraBold,
+          ...Ionicons.font,
+        },
+  );
 
   useEffect(() => {
-    const t = setTimeout(() => setFontTimeout(true), 5000);
+    const t = setTimeout(
+      () => setFontTimeout(true),
+      Platform.OS === 'web' ? WEB_FONT_GATE_MS : 5000,
+    );
     if (Platform.OS === 'web') {
       const style = document.createElement('style');
-      style.textContent = "@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.3/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal}"
-        + "html,body{height:100%;margin:0;overflow:hidden;}"
+      style.textContent =
+        "@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.3/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal}"
+        + "html,body{height:100%;margin:0;overflow:hidden;font-family:'Plus Jakarta Sans',system-ui,sans-serif;}"
         + "#root{display:flex;flex-direction:column;flex:1;min-height:100dvh;max-height:100dvh;overflow:hidden;}"
         + "[data-focusable=true]{touch-action:manipulation;}"
         + "textarea,input{-webkit-user-select:text;user-select:text;}"
         + "#welcome-scroll{overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}";
       document.head.appendChild(style);
+
+      const gf = document.createElement('link');
+      gf.rel = 'stylesheet';
+      gf.href =
+        'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
+      document.head.appendChild(gf);
 
       const upsertLink = (rel: string, href: string, type?: string) => {
         let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
@@ -54,7 +82,11 @@ export default function App() {
       upsertLink('icon', '/favicon.svg', 'image/svg+xml');
       upsertLink('alternate icon', '/favicon.png', 'image/png');
 
-      return () => { clearTimeout(t); document.head.removeChild(style); };
+      return () => {
+        clearTimeout(t);
+        document.head.removeChild(style);
+        document.head.removeChild(gf);
+      };
     }
     return () => clearTimeout(t);
   }, []);
@@ -65,32 +97,45 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const bootstrapAuth = async () => {
       const alreadyReady = useAuthStore.getState().authReady;
       if (!alreadyReady) {
         useAuthStore.setState({ authReady: false });
       }
+
       if (Platform.OS === 'web') {
         const { completeOAuthRedirectIfNeeded } = await import('./src/utils/completeOAuthRedirect');
         await completeOAuthRedirectIfNeeded();
       }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
 
       if (session?.user) {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError || !userData.user) {
-          await supabase.auth.signOut({ scope: 'local' });
-          setSession(null);
-        } else {
+        try {
+          const { data: userData, error: userError } = await withTimeout(
+            supabase.auth.getUser(),
+            8000,
+            'getUser',
+          );
+          if (userError || !userData.user) {
+            await supabase.auth.signOut({ scope: 'local' });
+            setSession(null);
+          } else {
+            setSession(session);
+            loadProfile(session.user.id).catch((e) => {
+              if (__DEV__) console.warn('[App] loadProfile:', e);
+            });
+          }
+        } catch (e) {
+          if (__DEV__) console.warn('[App] auth validation skipped:', e);
           setSession(session);
-          await loadProfile(session.user.id);
+          loadProfile(session.user.id).catch(() => {});
         }
       } else {
         setSession(null);
       }
-
-      if (mounted) useAuthStore.setState({ authReady: true });
 
       if (session?.user) {
         setTimeout(async () => {
@@ -98,18 +143,32 @@ export default function App() {
             const lastActive = useAuthStore.getState().profile?.last_active_date ?? null;
             const { checkAndSendStreakReminder } = await import('./src/services/notificationService');
             await checkAndSendStreakReminder(session.user.id, lastActive);
-          } catch {}
+          } catch { /* optional */ }
         }, 3000);
+      }
+    };
+
+    (async () => {
+      try {
+        await withTimeout(bootstrapAuth(), AUTH_BOOT_TIMEOUT_MS, 'auth bootstrap');
+      } catch (e) {
+        if (__DEV__) console.warn('[App] auth bootstrap:', e);
+      } finally {
+        if (mounted) useAuthStore.setState({ authReady: true });
       }
     })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const { data: userData, error } = await supabase.auth.getUser();
-        if (error || !userData.user) {
-          await supabase.auth.signOut({ scope: 'local' });
-          setSession(null);
-          return;
+        try {
+          const { data: userData, error } = await supabase.auth.getUser();
+          if (error || !userData.user) {
+            await supabase.auth.signOut({ scope: 'local' });
+            setSession(null);
+            return;
+          }
+        } catch {
+          /* keep session on transient network errors */
         }
       }
       setSession(session);
@@ -117,6 +176,7 @@ export default function App() {
         loadProfile(session.user.id).catch(() => {});
       }
     });
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
@@ -127,7 +187,10 @@ export default function App() {
     console.warn('Font loading error on web, continuing with default fonts:', fontsError);
   }
 
-  if (!fontsLoaded && !fontsError && !fontTimeout) {
+  const fontsReady =
+    Platform.OS === 'web' || fontsLoaded || !!fontsError || fontTimeout;
+
+  if (!fontsReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.bg }}>
         <ActivityIndicator color={theme.accent} size="large" />
