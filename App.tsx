@@ -61,10 +61,20 @@ export default function App() {
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
-      setSession(session);
+
       if (session?.user) {
-        await loadProfile(session.user.id);
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData.user) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+        } else {
+          setSession(session);
+          await loadProfile(session.user.id);
+        }
+      } else {
+        setSession(null);
       }
+
       if (mounted) useAuthStore.setState({ authReady: true });
 
       if (session?.user) {
@@ -78,7 +88,15 @@ export default function App() {
       }
     })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const { data: userData, error } = await supabase.auth.getUser();
+        if (error || !userData.user) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+          return;
+        }
+      }
       setSession(session);
       if (session?.user) {
         loadProfile(session.user.id).catch(() => {});
