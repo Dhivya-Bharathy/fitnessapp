@@ -39,6 +39,21 @@ export default function App() {
         + "textarea,input{-webkit-user-select:text;user-select:text;}"
         + "#welcome-scroll{overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}";
       document.head.appendChild(style);
+
+      const upsertLink = (rel: string, href: string, type?: string) => {
+        let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = rel;
+          document.head.appendChild(link);
+        }
+        link.href = href;
+        if (type) link.type = type;
+        else link.removeAttribute('type');
+      };
+      upsertLink('icon', '/favicon.svg', 'image/svg+xml');
+      upsertLink('alternate icon', '/favicon.png', 'image/png');
+
       return () => { clearTimeout(t); document.head.removeChild(style); };
     }
     return () => clearTimeout(t);
