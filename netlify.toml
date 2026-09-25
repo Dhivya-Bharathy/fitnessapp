@@ -18,3 +18,9 @@
   [headers.values]
     Cache-Control = "public, max-age=86400"
     Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/og-image.png"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+    Access-Control-Allow-Origin = "*"

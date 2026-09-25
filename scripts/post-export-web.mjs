@@ -5,10 +5,14 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import sharp from 'sharp';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const publicDir = path.join(root, 'public');
+
+const OG_W = 1200;
+const OG_H = 630;
 
 const siteUrl = (
   process.env.EXPO_PUBLIC_SITE_URL
@@ -22,35 +26,36 @@ if (!fs.existsSync(dist)) {
   process.exit(1);
 }
 
-function copyDir(src, dest) {
+function copyDir(src, dest, skip = new Set()) {
   if (!fs.existsSync(src)) return;
   fs.mkdirSync(dest, { recursive: true });
   for (const name of fs.readdirSync(src)) {
+    if (skip.has(name)) continue;
     const from = path.join(src, name);
     const to = path.join(dest, name);
-    if (fs.statSync(from).isDirectory()) copyDir(from, to);
+    if (fs.statSync(from).isDirectory()) copyDir(from, to, skip);
     else fs.copyFileSync(from, to);
   }
 }
 
-copyDir(publicDir, dist);
+copyDir(publicDir, dist, new Set(['og-image.jpg', 'og-image.png']));
 
-function jpegDimensions(filePath) {
-  const b = fs.readFileSync(filePath);
-  for (let j = 2; j < b.length - 8; j++) {
-    if (b[j] === 0xff && (b[j + 1] === 0xc0 || b[j + 1] === 0xc2)) {
-      return { height: b.readUInt16BE(j + 5), width: b.readUInt16BE(j + 7) };
-    }
-  }
-  return { width: 1200, height: 630 };
+const sourceOg = path.join(publicDir, 'og-image.jpg');
+if (fs.existsSync(sourceOg)) {
+  const jpegOut = path.join(dist, 'og-image.jpg');
+  const pngOut = path.join(dist, 'og-image.png');
+  const resized = () => sharp(sourceOg).resize(OG_W, OG_H, { fit: 'cover', position: 'centre' });
+  await resized().jpeg({ quality: 85, mozjpeg: true, chromaSubsampling: '4:2:0' }).toFile(jpegOut);
+  await resized().png({ compressionLevel: 8 }).toFile(pngOut);
+  console.log(`post-export-web: optimized og-image → ${OG_W}x${OG_H} jpg + png`);
+} else {
+  console.warn('post-export-web: public/og-image.jpg missing');
 }
-
-const ogPath = path.join(dist, 'og-image.jpg');
-const dims = fs.existsSync(ogPath) ? jpegDimensions(ogPath) : { width: 1200, height: 630 };
 
 const indexPath = path.join(dist, 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 
+/** Use JPEG under ~300KB — WhatsApp often skips multi‑MB PNG previews. */
 const ogImage = siteUrl ? `${siteUrl}/og-image.jpg` : '/og-image.jpg';
 const ogUrl = siteUrl ? `${siteUrl}/` : '/';
 const ogTitle = 'Fitness App — Your AI Health Companion';
@@ -66,8 +71,8 @@ const previewMeta = `
     <meta property="og:image:url" content="${ogImage}" />
     <meta property="og:image:secure_url" content="${ogImage}" />
     <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="${dims.width}" />
-    <meta property="og:image:height" content="${dims.height}" />
+    <meta property="og:image:width" content="${OG_W}" />
+    <meta property="og:image:height" content="${OG_H}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${ogTitle}" />
     <meta name="twitter:description" content="Track • Scan • Plan • Get AI Guidance • Stay Healthy" />
