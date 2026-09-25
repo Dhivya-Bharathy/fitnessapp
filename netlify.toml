@@ -1,5 +1,5 @@
 [build]
-  command = "npm ci && npx expo export -p web"
+  command = "npm ci && npx expo export -p web && node scripts/post-export-web.mjs"
   publish = "dist"
 
 [[redirects]]
