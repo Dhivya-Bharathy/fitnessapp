@@ -7,10 +7,12 @@ export function useMobileScrollProps() {
       scrollViewStyle: {
         flex: 1 as const,
         minHeight: 0 as const,
+        height: 0 as const,
         overflowY: 'auto' as const,
         overflowX: 'hidden' as const,
         WebkitOverflowScrolling: 'touch' as const,
         touchAction: 'pan-y' as const,
+        overscrollBehavior: 'contain' as const,
       },
       scrollProps: {
         showsVerticalScrollIndicator: true,

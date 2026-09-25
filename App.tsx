@@ -36,7 +36,8 @@ export default function App() {
         + "html,body{height:100%;margin:0;overflow:hidden;}"
         + "#root{display:flex;flex-direction:column;flex:1;min-height:100dvh;max-height:100dvh;overflow:hidden;}"
         + "[data-focusable=true]{touch-action:manipulation;}"
-        + "textarea,input{-webkit-user-select:text;user-select:text;}";
+        + "textarea,input{-webkit-user-select:text;user-select:text;}"
+        + "#welcome-scroll{overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;}";
       document.head.appendChild(style);
       return () => { clearTimeout(t); document.head.removeChild(style); };
     }

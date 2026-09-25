@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,11 +29,63 @@ const HIGHLIGHTS = [
   'Real-time guidance from an AI coach that adapts to you',
 ];
 
+/** Space reserved above the fixed sign-in bar so list content is not hidden under it. */
+const FOOTER_CONTENT_PAD = 196;
+
+function WelcomeSignInFooter({
+  googleLoading,
+  onGetStarted,
+  bottomInset,
+}: {
+  googleLoading: boolean;
+  onGetStarted: () => void;
+  bottomInset: number;
+}) {
+  return (
+    <View style={[styles.footerFixed, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
+      <TouchableOpacity
+        disabled={googleLoading}
+        onPress={onGetStarted}
+        activeOpacity={0.88}
+        style={styles.primaryBtn}
+        accessibilityRole="button"
+        accessibilityLabel="Get started with Google"
+      >
+        {googleLoading ? (
+          <ActivityIndicator color="#050608" />
+        ) : (
+          <>
+            <Text style={styles.primaryBtnText}>Get Started</Text>
+            <Ionicons name="arrow-forward" size={20} color="#050608" />
+          </>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        disabled={googleLoading}
+        onPress={onGetStarted}
+        activeOpacity={0.85}
+        style={styles.googleRow}
+      >
+        <Text style={styles.googleG}>G</Text>
+        <Text style={styles.googleLabel}>Continue with Google</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.legal}>
+        By continuing, you agree to our Terms & Privacy. Your progress syncs when you sign in.
+      </Text>
+    </View>
+  );
+}
+
 export default function WelcomeScreen() {
   const navigation = useNavigation<any>();
-  const { height: windowH } = useWindowDimensions();
+  const { height: windowH, width: windowW } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const heroHeight = Math.min(Math.max(windowH * 0.42, 240), 360);
+  const compact = windowH < 760 || windowW < 400;
+  const heroHeight = compact
+    ? Math.min(Math.max(windowH * 0.26, 160), 200)
+    : Math.min(Math.max(windowH * 0.34, 200), 280);
 
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const user = useAuthStore((s) => s.user);
@@ -42,6 +94,11 @@ export default function WelcomeScreen() {
   const loadProfile = useAuthStore((s) => s.loadProfile);
   const [googleLoading, setGoogleLoading] = useState(false);
   const autoNavDone = useRef(false);
+
+  const highlights = useMemo(
+    () => (compact ? HIGHLIGHTS.slice(0, 2) : HIGHLIGHTS),
+    [compact],
+  );
 
   const continueAfterAuth = useCallback(async () => {
     const { user: u, profile: p } = useAuthStore.getState();
@@ -103,14 +160,14 @@ export default function WelcomeScreen() {
     }
   };
 
+  const scrollPadBottom = FOOTER_CONTENT_PAD + Math.max(insets.bottom, spacing.sm);
+
   return (
     <View style={[styles.root, { backgroundColor: BG, paddingTop: insets.top }]}>
       <ScreenScrollView
+        nativeID="welcome-scroll"
         showsVerticalScrollIndicator={Platform.OS !== 'web'}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.md },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPadBottom }]}
       >
         <View style={[styles.heroWrap, { height: heroHeight }]}>
           <Image source={HERO} style={styles.heroImage} resizeMode="cover" />
@@ -129,17 +186,17 @@ export default function WelcomeScreen() {
 
         <View style={styles.body}>
           <Text style={styles.kicker}>FITNESS APP</Text>
-          <Text style={styles.headline}>
+          <Text style={[styles.headline, compact && styles.headlineCompact]}>
             Lose fat.{'\n'}Build muscle.{'\n'}
             <Text style={styles.headlineAccent}>Stay consistent.</Text>
           </Text>
-          <Text style={styles.subhead}>
+          <Text style={[styles.subhead, compact && styles.subheadCompact]}>
             One place for training, Indian nutrition, and an AI coach that actually knows your routine.
           </Text>
 
           <View style={styles.list}>
-            {HIGHLIGHTS.map((line) => (
-              <View key={line} style={styles.listRow}>
+            {highlights.map((line) => (
+              <View key={line} style={[styles.listRow, compact && styles.listRowCompact]}>
                 <View style={styles.checkWrap}>
                   <Ionicons name="checkmark" size={16} color={ACCENT} />
                 </View>
@@ -148,41 +205,13 @@ export default function WelcomeScreen() {
             ))}
           </View>
         </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            disabled={googleLoading}
-            onPress={onGetStarted}
-            activeOpacity={0.88}
-            style={styles.primaryBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Get started with Google"
-          >
-            {googleLoading ? (
-              <ActivityIndicator color="#050608" />
-            ) : (
-              <>
-                <Text style={styles.primaryBtnText}>Get Started</Text>
-                <Ionicons name="arrow-forward" size={20} color="#050608" />
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            disabled={googleLoading}
-            onPress={onGetStarted}
-            activeOpacity={0.85}
-            style={styles.googleRow}
-          >
-            <Text style={styles.googleG}>G</Text>
-            <Text style={styles.googleLabel}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.legal}>
-            By continuing, you agree to our Terms & Privacy. Your progress syncs when you sign in.
-          </Text>
-        </View>
       </ScreenScrollView>
+
+      <WelcomeSignInFooter
+        googleLoading={googleLoading}
+        onGetStarted={onGetStarted}
+        bottomInset={insets.bottom}
+      />
     </View>
   );
 }
@@ -227,7 +256,7 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   kicker: {
     color: ACCENT,
@@ -244,12 +273,22 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: spacing.md,
   },
+  headlineCompact: {
+    fontSize: 28,
+    lineHeight: 34,
+    marginBottom: spacing.sm,
+  },
   headlineAccent: { color: ACCENT },
   subhead: {
     color: 'rgba(255,255,255,0.62)',
     fontSize: fontSize.base,
     lineHeight: 22,
     marginBottom: spacing.lg,
+  },
+  subheadCompact: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    marginBottom: spacing.md,
   },
   list: { gap: spacing.sm },
   listRow: {
@@ -262,6 +301,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
+  },
+  listRowCompact: {
+    paddingVertical: 10,
   },
   checkWrap: {
     width: 28,
@@ -279,13 +321,28 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '500',
   },
-  footer: {
+  footerFixed: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.sm,
     gap: spacing.sm,
-    marginTop: spacing.sm,
+    backgroundColor: BG,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    zIndex: 10,
+    ...Platform.select({
+      web: { boxShadow: '0 -12px 32px rgba(0,0,0,0.55)' as unknown as number },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+      },
+      android: { elevation: 16 },
+    }),
   },
   primaryBtn: {
     flexDirection: 'row',
