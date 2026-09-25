@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Platform, TouchableOpacity } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, fontSize } from '../theme';
@@ -14,6 +14,7 @@ interface Props {
   exercise: ExerciseData;
   isActive: boolean;
   secondsLeft: number;
+  onStopDemo?: () => void;
 }
 
 function GradientBg({ color }: { color: string }) {
@@ -78,7 +79,7 @@ function GlowParticle({ cx, cy, color }: { cx: number; cy: number; color: string
   );
 }
 
-export default function AnimatedExerciseDemo({ exercise, isActive, secondsLeft }: Props) {
+export default function AnimatedExerciseDemo({ exercise, isActive, secondsLeft, onStopDemo }: Props) {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const catColor = CATEGORY_MAP[exercise.category]?.color ?? '#2DDC8C';
@@ -333,6 +334,16 @@ export default function AnimatedExerciseDemo({ exercise, isActive, secondsLeft }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      {onStopDemo && isActive ? (
+        <TouchableOpacity
+          onPress={onStopDemo}
+          style={[styles.stopBtn, { borderColor: theme.border, backgroundColor: theme.bg }]}
+          accessibilityLabel="Stop exercise demo animation"
+        >
+          <Ionicons name="stop-circle" size={18} color="#FF5959" />
+          <Text style={[styles.stopBtnText, { color: theme.textPrimary }]}>Stop demo</Text>
+        </TouchableOpacity>
+      ) : null}
       <Animated.View style={[styles.svgWrap, { transform: [{ scale: pulseScale }] }]}>
         <Svg width={SVG_SIZE} height={SVG_SIZE} viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}>
           <GradientBg color={catColor} />
@@ -375,6 +386,17 @@ export default function AnimatedExerciseDemo({ exercise, isActive, secondsLeft }
 }
 
 const styles = StyleSheet.create({
+  stopBtn: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  stopBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
   container: {
     borderRadius: 20,
     borderWidth: 1,

@@ -388,11 +388,20 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
   "total_calories": 250
 }`;
 
+  const visionModel =
+    VISION_MODEL.startsWith('gpt') || VISION_MODEL.includes('4o')
+      ? VISION_MODEL
+      : OPENAI_CHAT_MODEL.startsWith('gpt')
+        ? OPENAI_CHAT_MODEL
+        : 'gpt-4o-mini';
+
+  let lastError = 'Could not analyze this photo.';
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const startTime = Date.now();
     try {
       const { data, error } = await invokeAI({
-        model: VISION_MODEL,
+        model: visionModel,
         messages: [
           {
             role: 'user',
@@ -403,19 +412,20 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
           },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_tokens: 1200,
         response_format: { type: 'json_object' },
       });
 
       const latencyMs = Date.now() - startTime;
 
       if (error || !data) {
+        lastError = error || lastError;
         await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: error || 'No response' });
         if (attempt < MAX_RETRIES - 1) {
           await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
           continue;
         }
-        return null;
+        throw new Error(lastError);
       }
 
       const responseText = data?.choices?.[0]?.message?.content ?? '';
@@ -435,13 +445,15 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
         return parsed;
       }
 
+      lastError = 'AI could not identify food in this image. Try a clearer photo.';
       if (attempt < MAX_RETRIES - 1) {
         await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
         continue;
       }
     } catch (e: any) {
       const latencyMs = Date.now() - startTime;
-      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: e?.message ?? 'Scan network error' });
+      lastError = e?.message ?? lastError;
+      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: lastError });
       if (attempt < MAX_RETRIES - 1) {
         await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
         continue;
@@ -449,7 +461,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
     }
   }
 
-  return null;
+  throw new Error(lastError);
 }
 
 /** Suggests meal ideas based on remaining daily macros. @param userId - The authenticated user's ID. @param remainingProtein - Remaining protein goal in grams. @param remainingCarbs - Remaining carbs goal in grams. @param remainingFats - Remaining fats goal in grams. @returns An array of suggested meals with names and macros, or empty array on failure. @throws Never throws — returns empty array on failure. */

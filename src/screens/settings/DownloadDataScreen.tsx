@@ -1,17 +1,14 @@
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, Share,
+  TouchableOpacity, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { Share as RNShare } from 'react-native';
-// expo-file-system and expo-sharing are optional — using built-in Share as fallback
-// Install with: npx expo install expo-file-system expo-sharing
-// Then swap the handleExport function below with the FileSystem version
 import { useThemeStore } from '../../store/themeStore';
+import { saveExportFile } from '../../utils/exportDownload';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
@@ -38,29 +35,47 @@ const EXPORT_SECTIONS = [
 ];
 
 // ── FETCH ALL USER DATA ───────────────────────────────────────
+async function fetchTable<T>(
+  table: string,
+  userId: string,
+  orderCol: string,
+  warnings: string[],
+): Promise<T[]> {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq('user_id', userId)
+    .order(orderCol, { ascending: false });
+  if (error) {
+    warnings.push(`${table}: ${error.message}`);
+    if (__DEV__) console.warn(`[export] ${table}:`, error.message);
+    return [];
+  }
+  return (data ?? []) as T[];
+}
+
 async function fetchAllData(userId: string) {
-  const [
-    profileRes, foodRes, waterRes, workoutRes,
-    stepsRes, sleepRes, fastingRes,
-  ] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', userId).single(),
-    supabase.from('food_logs').select('*').eq('user_id', userId).order('logged_at', { ascending: false }),
-    supabase.from('water_logs').select('*').eq('user_id', userId).order('logged_at', { ascending: false }),
-    supabase.from('workout_sessions').select('*').eq('user_id', userId).order('completed_at', { ascending: false }),
-    supabase.from('step_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-    supabase.from('sleep_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-    supabase.from('fasting_logs').select('*').eq('user_id', userId).order('started_at', { ascending: false }),
+  const warnings: string[] = [];
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  if (profileError) {
+    warnings.push(`profiles: ${profileError.message}`);
+    if (__DEV__) console.warn('[export] profiles:', profileError.message);
+  }
+
+  const [food, water, workouts, steps, sleep, fasting] = await Promise.all([
+    fetchTable<any>('food_logs', userId, 'logged_at', warnings),
+    fetchTable<any>('water_logs', userId, 'logged_at', warnings),
+    fetchTable<any>('workout_sessions', userId, 'completed_at', warnings),
+    fetchTable<any>('step_logs', userId, 'date', warnings),
+    fetchTable<any>('sleep_logs', userId, 'date', warnings),
+    fetchTable<any>('fasting_logs', userId, 'started_at', warnings),
   ]);
 
-  return {
-    profile:   profileRes.data,
-    food:      foodRes.data ?? [],
-    water:     waterRes.data ?? [],
-    workouts:  workoutRes.data ?? [],
-    steps:     stepsRes.data ?? [],
-    sleep:     sleepRes.data ?? [],
-    fasting:   fastingRes.data ?? [],
-  };
+  return { profile, food, water, workouts, steps, sleep, fasting, warnings };
 }
 
 // ── GENERATE CSV ──────────────────────────────────────────────
@@ -113,15 +128,17 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
     sections.push('');
   }
 
+  const waterGoalMl = String(p?.water_goal_ml ?? 2500);
+
   // Water logs
   if ((data.water as any[]).length > 0) {
     sections.push('=== WATER LOGS ===');
     sections.push(rowsToCSV(
-      ['Date', 'Amount (ml)', 'Goal (ml)'],
+      ['Date', 'Amount (ml)', 'Daily goal (ml)'],
       (data.water as any[]).map((r) => [
         r.logged_at?.split('T')[0] ?? '',
         String(r.amount_ml ?? 0),
-        String(r.goal_ml ?? 2500),
+        waterGoalMl,
       ])
     ));
     sections.push('');
@@ -131,15 +148,13 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
   if ((data.workouts as any[]).length > 0) {
     sections.push('=== WORKOUT HISTORY ===');
     sections.push(rowsToCSV(
-      ['Date', 'Exercise', 'Duration (min)', 'Calories Burned', 'Sets', 'Reps', 'Weight (kg)'],
+      ['Date', 'Workout', 'Duration (min)', 'Calories burned', 'Status'],
       (data.workouts as any[]).map((r) => [
-        r.completed_at?.split('T')[0] ?? '',
-        r.exercise_name ?? '',
-        String(r.duration_minutes ?? ''),
+        r.completed_at?.split('T')[0] ?? r.created_at?.split('T')[0] ?? '',
+        r.name ?? r.exercise_name ?? '',
+        r.duration_seconds != null ? String(Math.round(Number(r.duration_seconds) / 60)) : String(r.duration_minutes ?? ''),
         String(r.calories_burned ?? 0),
-        String(r.sets ?? ''),
-        String(r.reps ?? ''),
-        String(r.weight_kg ?? ''),
+        r.status ?? 'completed',
       ])
     ));
     sections.push('');
@@ -166,8 +181,8 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
       ['Date', 'Duration (h)', 'Quality', 'Bedtime', 'Wake Time'],
       (data.sleep as any[]).map((r) => [
         r.date ?? '',
-        String(r.duration_hours ?? ''),
-        r.quality ?? '',
+        String(r.hours ?? r.duration_hours ?? ''),
+        r.quality != null ? String(r.quality) : '',
         r.bedtime ?? '',
         r.wake_time ?? '',
       ])
@@ -182,9 +197,9 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
       ['Started', 'Ended', 'Protocol', 'Status'],
       (data.fasting as any[]).map((r) => [
         r.started_at?.split('T')[0] ?? '',
-        r.completed_at?.split('T')[0] ?? '',
+        r.ended_at?.split('T')[0] ?? r.completed_at?.split('T')[0] ?? '',
         r.protocol ?? '',
-        r.status ?? '',
+        r.completed === true ? 'completed' : r.status ?? 'active',
       ])
     ));
     sections.push('');
@@ -205,7 +220,7 @@ function buildTextReport(data: Awaited<ReturnType<typeof fetchAllData>>, userNam
   const totalWO    = workouts.length;
   const totalSteps = steps.reduce((s: number, r: any) => s + (r.steps ?? 0), 0);
   const avgSleep   = sleep.length > 0
-    ? (sleep.reduce((s: number, r: any) => s + (r.duration_hours ?? 0), 0) / sleep.length).toFixed(1)
+    ? (sleep.reduce((s: number, r: any) => s + Number(r.hours ?? r.duration_hours ?? 0), 0) / sleep.length).toFixed(1)
     : '—';
 
   return `
@@ -242,7 +257,7 @@ Fasting Sessions:     ${(data.fasting as any[]).length}
 RECENT WORKOUTS (last 10)
 ──────────────────────────────────────
 ${workouts.slice(0, 10).map((w: any) =>
-  `${w.completed_at?.split('T')[0] ?? '—'}  ${w.exercise_name ?? '—'}  ${w.calories_burned ?? 0} kcal`
+  `${w.completed_at?.split('T')[0] ?? '—'}  ${w.name ?? w.exercise_name ?? '—'}  ${w.calories_burned ?? 0} kcal`
 ).join('\n') || 'No workouts logged yet.'}
 
 ──────────────────────────────────────
@@ -294,11 +309,26 @@ export default function DownloadDataScreen() {
   const userName = (profile as any)?.calfit_id
     || profile?.full_name?.toLowerCase().replace(/\s+/g, '') || 'calfit_user';
 
+  const safeFileLabel = userName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'user';
+
   const handleExport = async () => {
     if (!user?.id) return;
     setIsLoading(true);
     try {
       const data = await fetchAllData(user.id);
+
+      if (data.warnings.length > 0) {
+        const warnText = `Some data could not be loaded:\n\n${data.warnings.slice(0, 5).join('\n')}`;
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.alert(`${warnText}\n\nExport will continue with available data.`);
+        } else {
+          await new Promise<void>((resolve) => {
+            Alert.alert('Partial data', `${warnText}\n\nExport will continue with available data.`, [
+              { text: 'Continue', onPress: () => resolve() },
+            ]);
+          });
+        }
+      }
 
       // Update summary stats
       setSummary({
@@ -309,36 +339,31 @@ export default function DownloadDataScreen() {
       });
 
       // Generate the export content
-      const exportContent = exportFormat === 'csv'
+      let exportContent = exportFormat === 'csv'
         ? buildCSV(data, userName)
         : buildTextReport(data, userName);
+      if (exportFormat === 'csv') {
+        exportContent = `\uFEFF${exportContent}`;
+      }
 
-      // ── OPTION A: If expo-file-system + expo-sharing are installed ──
-      // Uncomment this block and comment out Option B below:
-      //
-      // const filename = `calfit_export_${userName}_${new Date().toISOString().split('T')[0]}`;
-      // const ext = exportFormat === 'csv' ? 'csv' : 'txt';
-      // const fileUri = `${FileSystem.documentDirectory}${filename}.${ext}`;
-      // await FileSystem.writeAsStringAsync(fileUri, exportContent, {
-      //   encoding: FileSystem.EncodingType.UTF8
-      // });
-      // await Sharing.shareAsync(fileUri, {
-      //   mimeType: exportFormat === 'csv' ? 'text/csv' : 'text/plain',
-      //   dialogTitle: `Fitness App Data Export — ${exportFormat.toUpperCase()}`,
-      // });
+      const dateStamp = new Date().toISOString().split('T')[0];
+      const ext = exportFormat === 'csv' ? 'csv' : 'txt';
+      const filename = `fitness_export_${safeFileLabel}_${dateStamp}.${ext}`;
+      const mime = exportFormat === 'csv' ? 'text/csv' : 'text/plain';
 
-      // ── OPTION B: Built-in Share (works without extra packages) ──
-      // Shares the content as text — user can copy/paste or send via any app.
-      // For true file download, install expo-file-system + expo-sharing and use Option A.
-      const previewLines = exportContent.split('\n').slice(0, 40).join('\n');
-      await RNShare.share({
-        message: exportFormat === 'csv'
-          ? `Fitness App CSV Export\n\nOpen in Excel or Google Sheets.\n\n${previewLines}\n\n[Full export — ${exportContent.length.toLocaleString()} characters]`
-          : exportContent,
-        title: `Fitness App Data Export — ${exportFormat.toUpperCase()}`,
-      });
-    } catch (e: any) {
-      Alert.alert('Export Failed', e?.message ?? 'Could not generate export. Please try again.');
+      await saveExportFile(exportContent, filename, mime);
+
+      const successMsg = `${filename} should appear in your Downloads folder.`;
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(`Download started\n\n${successMsg}`);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not generate export. Please try again.';
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(`Export failed\n\n${msg}`);
+      } else {
+        Alert.alert('Export Failed', msg);
+      }
     } finally {
       setIsLoading(false);
     }

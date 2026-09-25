@@ -53,7 +53,6 @@ import MealPlanScreen from '../screens/meals/MealPlanScreen';
 // ── AI FOOD SCANNER ───────────────────────────────────────────
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 import { isFitnessAssessmentComplete, getLocalAssessmentComplete } from '../utils/onboardingFlags';
-import { shouldShowOnboardingFlow } from '../utils/authGate';
 
 // ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
@@ -244,11 +243,9 @@ function TabNavigator() {
 
 // ── AUTH STACK (no headers — screens have own UI) ────────────
 function AuthStack() {
-  const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const authEpoch = useAuthStore((s) => s.authEpoch);
-  const forceAssessmentRetake = useAuthStore((s) => s.forceAssessmentRetake);
   const [assessmentDoneLocal, setAssessmentDoneLocal] = useState(false);
 
   useEffect(() => {
@@ -266,32 +263,14 @@ function AuthStack() {
     };
   }, [user?.id, authEpoch]);
 
-  useEffect(() => {
-    if (!user?.id || !profile?.goal) return;
-    const assessmentDone =
-      !forceAssessmentRetake
-      && (isFitnessAssessmentComplete(profile) || assessmentDoneLocal);
-    if (!assessmentDone) {
-      navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
-    }
-  }, [
-    user?.id,
-    profile?.goal,
-    profile?.tracking_preferences,
-    forceAssessmentRetake,
-    assessmentDoneLocal,
-    navigation,
-  ]);
-
   const initialRoute = useMemo(() => {
     if (!user) return 'Welcome';
     if (!profile?.goal) return 'Onboarding';
     const assessmentDone =
-      !forceAssessmentRetake
-      && (isFitnessAssessmentComplete(profile) || assessmentDoneLocal);
+      isFitnessAssessmentComplete(profile) || assessmentDoneLocal;
     if (!assessmentDone) return 'FitnessAssessment';
-    return 'Welcome';
-  }, [user, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal, forceAssessmentRetake]);
+    return 'Onboarding';
+  }, [user, profile?.goal, profile?.tracking_preferences, assessmentDoneLocal]);
 
   return (
     <RootStack.Navigator
@@ -322,12 +301,12 @@ function AppStack() {
 
 // ── ROOT NAVIGATOR ────────────────────────────────────────────
 export default function AppNavigator() {
-  const { user, profile, authReady } = useAuthStore();
-  const forceAssessmentRetake = useAuthStore((s) => s.forceAssessmentRetake);
+  const { user, authReady, isOnboarding } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const authEpoch = useAuthStore((s) => s.authEpoch);
-  const showAuth = shouldShowOnboardingFlow(user, profile, { forceAssessmentRetake });
+  /** Uses loadProfile + local assessment flag — avoids kicking users back to Q1 when server profile lags. */
+  const showAuth = !user || isOnboarding;
   const navKey = `nav-${authEpoch}`;
 
   if (!authReady) {

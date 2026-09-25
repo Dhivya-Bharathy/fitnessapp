@@ -136,7 +136,7 @@ export default function SettingsScreen() {
       if (user?.id) {
         try {
           const { supabase } = await import('../../services/supabase');
-          const { data } = await supabase.from('profiles').select('id,calfit_id,full_name,goal,activity_level,age,height_cm,current_weight_kg,target_weight_kg,daily_calorie_goal,protein_goal_g,carb_goal_g,fat_goal_g,water_goal_ml,sleep_goal_hrs,step_goal,theme,units,dietary_preference,tracking_preferences,streak_count,last_active_date,created_at,updated_at,avatar_url').eq('id', user.id).single();
+          const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
           if (data && active) updateProfile(data);
         } catch {}
       }

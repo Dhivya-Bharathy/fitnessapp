@@ -36,6 +36,38 @@ async function upsertProfileRow(
   return { ok: false, message: 'Could not save profile after retries.' };
 }
 
+/** Updates profile fields, dropping columns missing on older Supabase schemas. */
+export async function updateProfileAdaptive(
+  userId: string,
+  fields: Record<string, unknown>,
+): Promise<{ ok: boolean; message?: string; applied?: Record<string, unknown> }> {
+  const payload: Record<string, unknown> = {
+    ...fields,
+    updated_at: new Date().toISOString(),
+  };
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const keys = Object.keys(payload).filter((k) => k !== 'updated_at');
+    if (keys.length === 0) {
+      return { ok: false, message: 'No profile fields could be updated on the server.' };
+    }
+
+    const { error } = await supabase.from('profiles').update(payload).eq('id', userId);
+    if (!error) return { ok: true, applied: payload };
+
+    const missing = missingColumnFromError(error.message);
+    if (missing && missing in payload) {
+      delete payload[missing];
+      continue;
+    }
+
+    if (__DEV__) console.error('[updateProfileAdaptive]', error.message);
+    return { ok: false, message: error.message || 'Profile update failed.' };
+  }
+
+  return { ok: false, message: 'Profile update failed after retries.' };
+}
+
 /** Represents a user's profile data including goals, body metrics, preferences, and daily targets. */
 export interface Profile {
   id: string;

@@ -473,7 +473,7 @@ export default function HomeScreen() {
         supabase.from('notifications').select('id', { count: 'exact' })
           .eq('user_id', user.id).eq('read', false),
         supabase.from('profiles')
-          .select('streak_count,last_active_date,full_name,calfit_id')
+          .select('streak_count,full_name,calfit_id')
           .eq('id', user.id)
           .maybeSingle(),
       ]);

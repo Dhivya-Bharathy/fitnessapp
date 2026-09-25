@@ -41,6 +41,7 @@ export default function AssessmentResultsScreen() {
 
       if (user?.id) {
         await setLocalAssessmentComplete(user.id);
+        useAuthStore.getState().setOnboarding(false);
         await supabase.from('profiles').update({
           bio: plan.coach_summary?.slice(0, 500),
           equipment_preferences: plan.workout.focus_moves ?? plan.workout.demic_story_moves ?? [],

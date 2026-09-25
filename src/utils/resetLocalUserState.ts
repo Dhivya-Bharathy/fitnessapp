@@ -22,6 +22,8 @@ export function clearSupabaseAuthStorage(): void {
       if (!key) continue;
       if (
         key.startsWith('sb-') ||
+        key.startsWith('fitness-app-auth') ||
+        key.startsWith('fitness_oauth_') ||
         key.includes('supabase') ||
         key.includes('auth-token') ||
         (projectRef && key.includes(projectRef))

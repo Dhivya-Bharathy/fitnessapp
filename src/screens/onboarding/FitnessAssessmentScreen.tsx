@@ -58,15 +58,14 @@ export default function FitnessAssessmentScreen() {
   useEffect(() => {
     if (!hydrated) return;
     persistAssessmentIndex(index);
+  }, [index, hydrated]);
+
+  useEffect(() => () => {
     if (autoAdvanceTimer.current) {
       clearTimeout(autoAdvanceTimer.current);
       autoAdvanceTimer.current = null;
     }
-  }, [index, hydrated]);
-
-  useEffect(() => () => {
-    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
-  }, []);
+  }, [index]);
 
   const q = FITNESS_ASSESSMENT_QUESTIONS[index];
   const progress = (index + 1) / ASSESSMENT_QUESTION_COUNT;
@@ -102,7 +101,7 @@ export default function FitnessAssessmentScreen() {
       if (latest === value && FITNESS_ASSESSMENT_QUESTIONS[index]?.id === id) {
         goNext();
       }
-    }, 500);
+    }, 320);
   };
 
   const goBack = () => {
@@ -185,9 +184,10 @@ export default function FitnessAssessmentScreen() {
       return (
         <Pressable
           key={opt.value}
-          onPress={() =>
-            q.type === 'multi' ? toggleMulti(q.id, opt.value) : selectSingle(q.id, opt.value)
-          }
+          onPress={() => {
+            if (q.type === 'multi') toggleMulti(q.id, opt.value);
+            else selectSingle(q.id, opt.value);
+          }}
           style={({ pressed }) => [
             styles.option,
             {
@@ -221,14 +221,14 @@ export default function FitnessAssessmentScreen() {
     );
   }
 
-  const showFooterContinue = q.type !== 'single';
+  const showContinueButton = q.type !== 'single';
 
   return (
     <StickyFooterLayout
       backgroundColor={theme.bg}
       header={header}
       footer={
-        showFooterContinue ? (
+        showContinueButton ? (
           <PrimaryCTA
             label={continueLabel}
             onPress={handleContinue}
@@ -236,7 +236,7 @@ export default function FitnessAssessmentScreen() {
           />
         ) : (
           <Text style={[styles.tapHint, { color: theme.textMuted }]}>
-            Tap an option to continue
+            {canContinue ? 'Next question…' : 'Tap an option to continue'}
           </Text>
         )
       }

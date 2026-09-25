@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { StickyFooterLayout } from '../../components/onboarding/StickyFooterLayout';
 import { PrimaryCTA } from '../../components/onboarding/PrimaryCTA';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,8 +14,10 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { useIsCompactPhone, useLayoutWidth } from '../../hooks/useLayoutWidth';
 import { isFitnessAssessmentComplete } from '../../utils/onboardingFlags';
-
 const ACCENT = '#2DDC8C';
+
+const ONBOARDING_FLOW = ['welcome', 'goal', 'stats', 'account', 'generating'] as const;
+type OnboardingStepKey = (typeof ONBOARDING_FLOW)[number];
 
 function showUserMessage(title: string, message: string) {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -96,7 +98,11 @@ function StepWelcome({
 }
 
 // ── GOAL ───────────────────────────────────────────────────────
-function StepGoal({ theme, selected, onSelect }: { theme: typeof colors.light; selected: string; onSelect: (g: string) => void }) {
+function StepGoal({ theme, selected, onSelect }: {
+  theme: typeof colors.light;
+  selected: string;
+  onSelect: (g: string) => void;
+}) {
   const goals = [
     { label: 'Lose Weight', emoji: '🔥' },
     { label: 'Build Muscle', emoji: '💪' },
@@ -108,10 +114,10 @@ function StepGoal({ theme, selected, onSelect }: { theme: typeof colors.light; s
   return (
     <StepWrap>
       <StepTitle text="What's your goal?" theme={theme} />
-      <StepSub text="We'll tailor your experience around this." theme={theme} />
+      <StepSub text="Tap one — we'll take you to the next step." theme={theme} />
       <View style={styles.gridRow}>
         {goals.map((g) => (
-          <TouchableOpacity key={g.label} onPress={() => onSelect(g.label)}
+          <TouchableOpacity key={g.label} activeOpacity={0.88} onPress={() => onSelect(g.label)}
             style={[styles.gridTile, { backgroundColor: selected === g.label ? theme.accent : theme.card, borderColor: selected === g.label ? theme.accent : theme.border }]}>
             <Text style={styles.gridEmoji}>{g.emoji}</Text>
             <Text style={[styles.gridLabel, { color: selected === g.label ? '#fff' : theme.textPrimary }]}>{g.label}</Text>
@@ -154,10 +160,9 @@ function StepStats({ theme, height, setHeight, weight, setWeight }: {
 }
 
 // ── ACCOUNT ────────────────────────────────────────────────────
-function StepAccount({ theme, name, setName, username, setUsername, isLoading, onSignUp }: {
+function StepAccount({ theme, name, setName, username, setUsername }: {
   theme: typeof colors.light; name: string; setName: (v: string) => void;
   username: string; setUsername: (v: string) => void;
-  isLoading: boolean; onSignUp: () => void;
 }) {
   return (
     <StepWrap>
@@ -166,7 +171,10 @@ function StepAccount({ theme, name, setName, username, setUsername, isLoading, o
           <Text style={styles.logoLetter}>F</Text>
         </LinearGradient>
         <StepTitle text="Your Profile" theme={theme} />
-        <StepSub text="Set your display name and username to personalise your experience." theme={theme} />
+        <StepSub
+          text="Confirm your name and pick a username — then your AI plan intake begins."
+          theme={theme}
+        />
       </View>
       <View style={styles.fieldsWrap}>
         <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Display Name</Text>
@@ -183,15 +191,6 @@ function StepAccount({ theme, name, setName, username, setUsername, isLoading, o
             placeholder="e.g. johndoe" placeholderTextColor={theme.textMuted} autoCapitalize="none"
             style={[styles.fieldTextInput, { color: theme.textPrimary }]} />
         </View>
-      </View>
-      <TouchableOpacity onPress={onSignUp} disabled={isLoading} activeOpacity={0.85} style={styles.signUpBtnWrap}>
-        <LinearGradient colors={[theme.accent, '#0DAE6C'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signUpBtn}>
-          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.signUpBtnText}>Save & Continue →</Text>}
-        </LinearGradient>
-      </TouchableOpacity>
-      <View style={[styles.privacyNote, { backgroundColor: theme.accentDim as string, borderColor: theme.accent + '33' }]}>
-        <Ionicons name="shield-checkmark-outline" size={16} color={theme.accent} />
-        <Text style={[styles.privacyText, { color: theme.textSecondary }]}>Your data stays on this device. No sign-up or email required.</Text>
       </View>
     </StepWrap>
   );
@@ -216,10 +215,7 @@ export default function OnboardingScreen() {
   const layoutWidth = useLayoutWidth();
   const compact = useIsCompactPhone();
 
-  type StepKey = 'welcome' | 'goal' | 'stats' | 'account' | 'generating';
-  const flow: StepKey[] = ['welcome', 'goal', 'stats', 'account', 'generating'];
-
-  const [step, setStep] = useState<StepKey>('welcome');
+  const [step, setStep] = useState<OnboardingStepKey>('welcome');
   const [goal, setGoal] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
@@ -230,34 +226,90 @@ export default function OnboardingScreen() {
   const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { user, profile, forceAssessmentRetake } = useAuthStore.getState();
-    if (
-      user?.id
-      && profile?.goal
-      && (forceAssessmentRetake || !isFitnessAssessmentComplete(profile))
-    ) {
-      navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
+    const { user: u, profile, forceAssessmentRetake } = useAuthStore.getState();
+    if (!u?.id) return;
+
+    if (profile?.goal && profile?.full_name && profile?.calfit_id) {
+      if (forceAssessmentRetake || !isFitnessAssessmentComplete(profile)) {
+        navigation.reset({ index: 0, routes: [{ name: 'FitnessAssessment' }] });
+      } else {
+        setOnboarding(false);
+      }
+      return;
     }
-  }, [navigation]);
+
+    if (profile?.full_name) setName(profile.full_name);
+    else {
+      const meta = u.user_metadata ?? {};
+      const googleName =
+        (typeof meta.full_name === 'string' && meta.full_name)
+        || (typeof meta.name === 'string' && meta.name)
+        || [meta.given_name, meta.family_name].filter(Boolean).join(' ');
+      if (googleName) setName(googleName);
+    }
+
+    if (profile?.calfit_id) {
+      setUsername(String(profile.calfit_id).replace(/^@/, ''));
+    } else if (u.email) {
+      const local = u.email.split('@')[0].replace(/[^a-z0-9_]/g, '').toLowerCase().slice(0, 20);
+      if (local.length >= 3) setUsername(local);
+    }
+
+    if (profile?.goal) setGoal(profile.goal);
+    if (profile?.height_cm != null) setHeight(String(profile.height_cm));
+    if (profile?.current_weight_kg != null) setWeight(String(profile.current_weight_kg));
+
+    if (profile?.goal && profile?.height_cm && profile?.current_weight_kg) {
+      setStep('account');
+    } else if (profile?.goal) {
+      setStep('stats');
+    }
+  }, [navigation, setOnboarding]);
+
+  const autoStepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const goNext = useCallback(() => {
+    setStep((current) => {
+      const idx = ONBOARDING_FLOW.indexOf(current);
+      const next = ONBOARDING_FLOW[idx + 1];
+      return next ?? current;
+    });
+  }, []);
+
+  const scheduleAutoStep = useCallback((advance: () => void) => {
+    if (autoStepTimer.current) clearTimeout(autoStepTimer.current);
+    autoStepTimer.current = setTimeout(advance, 340);
+  }, []);
+
+  useEffect(() => () => {
+    if (autoStepTimer.current) clearTimeout(autoStepTimer.current);
+  }, []);
 
   const toggleTrackingPref = (id: string) => {
-    setTrackingPrefs((prev) =>
-      prev.includes(id) ? (prev.length > 1 ? prev.filter((x) => x !== id) : prev) : [...prev, id],
-    );
+    setTrackingPrefs((prev) => {
+      const next = prev.includes(id)
+        ? (prev.length > 1 ? prev.filter((x) => x !== id) : prev)
+        : [...prev, id];
+      if (step === 'welcome' && next.length > 0) {
+        scheduleAutoStep(goNext);
+      }
+      return next;
+    });
   };
 
-  const currentIndex = flow.indexOf(step);
+  const selectGoal = (g: string) => {
+    setGoal(g);
+    scheduleAutoStep(goNext);
+  };
+
+  const currentIndex = ONBOARDING_FLOW.indexOf(step);
   const isWelcome = step === 'welcome';
   const isGenerating = step === 'generating';
-  const showCTA = !isGenerating;
-
-  const goNext = () => {
-    const next = flow[currentIndex + 1];
-    if (next) setStep(next);
-  };
+  const progress = (currentIndex + 1) / (ONBOARDING_FLOW.length - 1);
+  const showPrimaryFooter = step === 'stats' || step === 'account';
   const goPrev = () => {
     if (isGenerating) return;
-    const prev = flow[currentIndex - 1];
+    const prev = ONBOARDING_FLOW[currentIndex - 1];
     if (prev) setStep(prev); else navigation.goBack();
   };
 
@@ -278,6 +330,15 @@ export default function OnboardingScreen() {
       let session = useAuthStore.getState().session;
 
       if (!userId) {
+        if (Platform.OS === 'web') {
+          showUserMessage(
+            'Sign in with Google',
+            'Go back to Welcome and tap Continue with Google, then complete this profile step.',
+          );
+          setOnboarding(false);
+          setIsLoading(false);
+          return;
+        }
         const { data: anonData, error } = await supabase.auth.signInAnonymously();
         if (error?.message?.includes('anonymous_provider_disabled') || (error as { code?: string })?.code === 'anonymous_provider_disabled') {
           Alert.alert(
@@ -353,12 +414,12 @@ export default function OnboardingScreen() {
     goNext();
   };
 
-  const btnLabel = step === 'welcome' ? "Let's Go  →" : step === 'account' ? 'Create My Account' : 'Continue →';
+  const btnLabel = step === 'account' ? 'Save & continue' : 'Continue';
 
   const getStep = () => {
     switch (step) {
       case 'welcome':  return <StepWelcome selected={trackingPrefs} onToggle={toggleTrackingPref} layoutWidth={layoutWidth} compact={compact} />;
-      case 'goal':     return <StepGoal theme={theme} selected={goal} onSelect={setGoal} />;
+      case 'goal':     return <StepGoal theme={theme} selected={goal} onSelect={selectGoal} />;
       case 'stats':    return <StepStats theme={theme} height={height} setHeight={setHeight} weight={weight} setWeight={setWeight} />;
       case 'account':  return (
         <>
@@ -367,7 +428,13 @@ export default function OnboardingScreen() {
               <Text style={styles.saveErrorText}>{profileSaveError}</Text>
             </View>
           ) : null}
-          <StepAccount theme={theme} name={name} setName={setName} username={username} setUsername={setUsername} isLoading={isLoading} onSignUp={handleSignUp} />
+          <StepAccount
+            theme={theme}
+            name={name}
+            setName={setName}
+            username={username}
+            setUsername={setUsername}
+          />
         </>
       );
       case 'generating': return <StepGenerating theme={theme} />;
@@ -378,33 +445,43 @@ export default function OnboardingScreen() {
   const bg = isWelcome ? '#080A0F' : theme.bg;
 
   const header = !isWelcome && !isGenerating ? (
-    <View style={styles.header}>
-      <TouchableOpacity onPress={goPrev} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-        <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-      </TouchableOpacity>
-      <Text style={[styles.headerLogo, { color: theme.accent }]}>Fitness App</Text>
-      <Text style={[styles.headerStep, { color: theme.textMuted }]}>{currentIndex}/{flow.length - 2}</Text>
+    <View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={goPrev} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerLogo, { color: theme.accent }]}>Fitness App</Text>
+        <Text style={[styles.headerStep, { color: theme.textMuted }]}>{currentIndex}/{ONBOARDING_FLOW.length - 2}</Text>
+      </View>
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+        <LinearGradient
+          colors={[theme.accent, '#0DAE6C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.progressFill, { width: `${Math.min(100, progress * 100)}%` }]}
+        />
+      </View>
     </View>
   ) : undefined;
 
-  const footer = showCTA ? (
-    <>
-      {isLoading ? (
-        <View style={styles.loadingFooter}>
-          <ActivityIndicator color={theme.accent} />
-        </View>
-      ) : (
-        <PrimaryCTA
-          label={btnLabel.replace(/\s*→\s*$/, '')}
-          onPress={handleNext}
-        />
-      )}
-      {step === 'welcome' && (
-        <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: spacing.sm }]}>
-          Your data stays on this device
-        </Text>
-      )}
-    </>
+  const footerHint = step === 'welcome'
+    ? 'Tap what you want to track'
+    : step === 'goal'
+      ? 'Tap your goal to continue'
+      : null;
+
+  const footer = isGenerating ? null : showPrimaryFooter ? (
+    isLoading ? (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator color={theme.accent} />
+      </View>
+    ) : (
+      <PrimaryCTA label={btnLabel} onPress={handleNext} />
+    )
+  ) : footerHint ? (
+    <Text style={[styles.footerHint, { color: isWelcome ? 'rgba(255,255,255,0.45)' : theme.textMuted }]}>
+      {footerHint}
+    </Text>
   ) : null;
 
   return (
@@ -425,6 +502,9 @@ const styles = StyleSheet.create({
   scrollCenter: { flexGrow: 1, justifyContent: 'center', minHeight: 280 },
   loadingFooter: { paddingVertical: spacing.md, alignItems: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  progressTrack: { height: 4, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%' },
+  footerHint: { textAlign: 'center', fontSize: fontSize.sm, fontWeight: '600', paddingVertical: spacing.md },
   headerLogo: { fontSize: fontSize.xl, fontWeight: '800' },
   headerStep: { fontSize: fontSize.sm, fontWeight: '600' },
   stepContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },

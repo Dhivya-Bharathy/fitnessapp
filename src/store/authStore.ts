@@ -27,6 +27,7 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ ok: boolean; message?: string }>;
   deleteAccount: () => Promise<{ ok: boolean; message?: string }>;
 }
 
@@ -153,6 +154,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  signInWithGoogle: async () => {
+    set({ isLoading: true });
+    try {
+      const { signInWithGoogle: googleSignIn } = await import('../services/googleAuth');
+      const result = await googleSignIn();
+      if (!result.ok) return result;
+      const { supabase } = await import('../services/supabase');
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user) {
+        await get().loadProfile(data.session.user.id);
+      }
+      return { ok: true };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   signOut: async () => {
     try {
       const { supabase } = await import('../services/supabase');
@@ -170,6 +188,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       userTier: 'free',
       liveSteps: 0,
       authReady: true,
+      forceAssessmentRetake: get().forceAssessmentRetake,
       authEpoch: get().authEpoch + 1,
     });
   },
@@ -178,8 +197,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const userId = get().user?.id;
 
     const { persistForceAssessmentRetake } = await import('../utils/onboardingFlags');
-    await persistForceAssessmentRetake(true);
-    set({ forceAssessmentRetake: true, isOnboarding: true });
+    await persistForceAssessmentRetake(false);
+    set({ forceAssessmentRetake: false, isOnboarding: true });
 
     const { resetLocalUserState, clearSupabaseAuthStorage } = await import('../utils/resetLocalUserState');
     await resetLocalUserState();
@@ -194,7 +213,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       const { supabase } = await import('../services/supabase');
-      await supabase.auth.signOut({ scope: 'local' });
+      await supabase.auth.signOut();
     } catch {}
     clearSupabaseAuthStorage();
 
@@ -203,7 +222,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session: null,
       profile: null,
       isOnboarding: true,
-      forceAssessmentRetake: true,
+      forceAssessmentRetake: false,
       isAuthenticated: false,
       userTier: 'free',
       liveSteps: 0,

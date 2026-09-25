@@ -34,8 +34,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: storageAdapter,
+    storageKey: 'fitness-app-auth',
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: !isWeb,
+    detectSessionInUrl: false,
+    flowType: 'pkce',
   },
 });

@@ -52,9 +52,9 @@ export default function App() {
       if (!alreadyReady) {
         useAuthStore.setState({ authReady: false });
       }
-      const { readForceAssessmentRetake } = await import('./src/utils/onboardingFlags');
-      if (await readForceAssessmentRetake()) {
-        useAuthStore.setState({ forceAssessmentRetake: true, isOnboarding: true });
+      if (Platform.OS === 'web') {
+        const { completeOAuthRedirectIfNeeded } = await import('./src/utils/completeOAuthRedirect');
+        await completeOAuthRedirectIfNeeded();
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
@@ -67,12 +67,9 @@ export default function App() {
       if (session?.user) {
         setTimeout(async () => {
           try {
-            const { data } = await supabase.from('profiles')
-              .select('last_active_date').eq('id', session.user.id).single();
-            if (data) {
-              const { checkAndSendStreakReminder } = await import('./src/services/notificationService');
-              await checkAndSendStreakReminder(session.user.id, data.last_active_date);
-            }
+            const lastActive = useAuthStore.getState().profile?.last_active_date ?? null;
+            const { checkAndSendStreakReminder } = await import('./src/services/notificationService');
+            await checkAndSendStreakReminder(session.user.id, lastActive);
           } catch {}
         }, 3000);
       }

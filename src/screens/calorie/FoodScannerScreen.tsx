@@ -23,6 +23,32 @@ interface ScanResult {
   serving_size: string;
 }
 
+async function uriToBase64Web(uri: string): Promise<string | null> {
+  try {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const data = reader.result as string;
+        resolve(typeof data === 'string' ? data.split(',')[1] ?? null : null);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function showScanMessage(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
+
 export default function FoodScannerScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -49,8 +75,13 @@ export default function FoodScannerScreen() {
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setImageBase64(result.assets[0].base64 ?? null);
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      let b64 = asset.base64 ?? null;
+      if (!b64 && asset.uri && Platform.OS === 'web') {
+        b64 = await uriToBase64Web(asset.uri);
+      }
+      setImageBase64(b64);
       setResults(null);
     }
   };
@@ -74,27 +105,26 @@ export default function FoodScannerScreen() {
   };
 
   const handleScan = async () => {
-    if (!user) {
-      Alert.alert('Sign in required', 'Please sign in to scan food.');
+    if (!user?.id) {
+      showScanMessage('Account needed', 'Finish onboarding first so we can save your scans.');
       return;
     }
     if (!imageBase64) {
-      Alert.alert('No image', 'Choose a photo from your gallery first.');
+      showScanMessage('No image', 'Choose a photo from your gallery first.');
       return;
     }
     setIsScanning(true);
     try {
       const data = await scanFoodImage(user.id, imageBase64);
-      if (data && data.items.length > 0) {
+      if (data?.items?.length) {
         setResults(data.items);
-      } else {
-        Alert.alert(
-          'Scan unavailable',
-          'Could not analyze this photo. On your PC run npm run proxy:ai, keep Expo running, and ensure EXPO_PUBLIC_ASSESSMENT_PROXY_URL points to your PC IP:8787 on phone.',
-        );
       }
-    } catch {
-      Alert.alert('Scan failed', 'Something went wrong. Please try again.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Scan failed.';
+      const hint = Platform.OS === 'web' && typeof window !== 'undefined' && /netlify\.app/i.test(window.location.hostname)
+        ? '\n\nOn Netlify: set OPENAI_API_KEY in site env and redeploy.'
+        : '\n\nLocal dev: run npm run proxy:ai on your PC (port 8787).';
+      showScanMessage('Food scan failed', msg + hint);
     } finally {
       setIsScanning(false);
     }

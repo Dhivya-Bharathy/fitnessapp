@@ -10,7 +10,8 @@
     "build:web": "expo export -p web",
     "test:smoke": "node scripts/e2e-smoke.mjs",
     "test:e2e": "node scripts/e2e-ui.mjs",
-    "proxy:ai": "node scripts/openai-proxy.mjs"
+    "proxy:ai": "node scripts/openai-proxy.mjs",
+    "validate:oauth": "node scripts/validate-oauth.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",

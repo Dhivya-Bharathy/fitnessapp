@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
@@ -19,13 +20,22 @@ import { UserAvatar } from '../../modules/shared/UserAvatar';
 import { supabase } from '../../services/supabase';
 import { MilestoneCelebration, checkStreakMilestone, Milestone } from '../../components/MilestoneCelebration';
 import { localDateIso, previousLocalDateIso } from '../../utils/localDate';
-import { getProfile } from '../../services/profileService';
+import { getProfile, updateProfileAdaptive } from '../../services/profileService';
+import { readLocalStreak, writeLocalStreak } from '../../utils/localStreak';
 
 const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';
 const PINK   = '#FF6B9D';
 const BLUE   = '#6699FF';
 const GREEN  = '#2DDC8C';
+
+function streakAlert(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
 
 const MILESTONES = [
   { days: 3,   emoji: '🔥', label: '3-Day Spark',      color: ORANGE },
@@ -128,25 +138,72 @@ export default function StreaksScreen() {
   useFocusEffect(useCallback(() => {
     if (!user?.id) return;
     loadPartners();
-    getProfile(user.id).then((p) => {
-      if (p) updateProfile(p);
-    });
+    (async () => {
+      const p = await getProfile(user.id);
+      if (p) {
+        updateProfile(p);
+        return;
+      }
+      const local = await readLocalStreak(user.id);
+      if (local) {
+        updateProfile({
+          streak_count: local.streak_count,
+          last_active_date: local.last_active_date,
+          streak_freeze_used_week: local.streak_freeze_used_week,
+        });
+      }
+    })();
   }, [user?.id, updateProfile]));
 
   const loadPartners = async () => {
     if (!user?.id) return;
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('partners')
-        .select('partner_id, partner_profile:partner_id(full_name,calfit_id,avatar_url,streak_count)')
-        .eq('user_id', user.id).eq('status', 'active');
-      if (data) setPartners((data as any[]).map(p => ({
-        partner_id:   p.partner_id,
-        full_name:    p.partner_profile?.full_name    ?? 'Partner',
-        calfit_id:    p.partner_profile?.calfit_id    ?? '',
-        avatar_url:   p.partner_profile?.avatar_url   ?? null,
-        streak_count: p.partner_profile?.streak_count ?? 0,
-      })));
+        .select(`
+          partner_id,
+          partner:profiles!partners_partner_id_fkey (
+            full_name,
+            calfit_id,
+            avatar_url,
+            streak_count
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      if (error) {
+        const { data: rows } = await supabase
+          .from('partners')
+          .select('partner_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+        if (!rows?.length) return;
+        const enriched = await Promise.all(
+          rows.map(async (row) => {
+            const prof = await getProfile(row.partner_id);
+            return {
+              partner_id: row.partner_id,
+              full_name: prof?.full_name ?? 'Partner',
+              calfit_id: prof?.calfit_id ?? '',
+              avatar_url: prof?.avatar_url ?? null,
+              streak_count: prof?.streak_count ?? 0,
+            };
+          }),
+        );
+        setPartners(enriched);
+        return;
+      }
+
+      if (data) {
+        setPartners((data as any[]).map((p) => ({
+          partner_id: p.partner_id,
+          full_name: p.partner?.full_name ?? 'Partner',
+          calfit_id: p.partner?.calfit_id ?? '',
+          avatar_url: p.partner?.avatar_url ?? null,
+          streak_count: p.partner?.streak_count ?? 0,
+        })));
+      }
     } catch {}
   };
 
@@ -163,15 +220,25 @@ export default function StreaksScreen() {
         return;
       }
 
-      const { error } = await supabase.from('profiles').update({
+      const saved = await updateProfileAdaptive(user.id, {
         streak_count: newStreak,
         last_active_date: today,
         streak_freeze_used_week: false,
-      }).eq('id', user.id);
+      });
 
-      if (error) {
-        Alert.alert('Check-in failed', error.message || 'Could not save streak. Try again.');
-        return;
+      if (!saved.ok) {
+        await writeLocalStreak({
+          userId: user.id,
+          streak_count: newStreak,
+          last_active_date: today,
+          streak_freeze_used_week: false,
+        });
+        streakAlert(
+          'Saved on this device',
+          saved.message
+            ? `Server: ${saved.message}\n\nYour ${newStreak}-day streak is stored locally. Run supabase/migrations/000_full_schema.sql for full sync.`
+            : `Your ${newStreak}-day streak is stored on this device.`,
+        );
       }
 
       updateProfile({
@@ -183,11 +250,11 @@ export default function StreaksScreen() {
       const hit = checkStreakMilestone(newStreak);
       if (hit) {
         setMilestone(hit);
-      } else {
-        Alert.alert('Streak extended! 🔥', `You're on a ${newStreak}-day streak. Keep it up!`);
+      } else if (saved.ok) {
+        streakAlert('Streak extended! 🔥', `You're on a ${newStreak}-day streak. Keep it up!`);
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not check in. Please try again.');
+      streakAlert('Error', e?.message || 'Could not check in. Please try again.');
     } finally {
       setIsCheckingIn(false);
     }
@@ -205,16 +272,20 @@ export default function StreaksScreen() {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Freeze', onPress: async () => {
           if (!user?.id) return;
-          const { error } = await supabase.from('profiles').update({
+          const saved = await updateProfileAdaptive(user.id, {
             streak_freeze_used_week: true,
             last_active_date: today,
-          }).eq('id', user.id);
-          if (error) {
-            Alert.alert('Error', error.message || 'Could not freeze streak.');
-            return;
+          });
+          if (!saved.ok) {
+            await writeLocalStreak({
+              userId: user.id,
+              streak_count: streak,
+              last_active_date: today,
+              streak_freeze_used_week: true,
+            });
           }
           updateProfile({ streak_freeze_used_week: true, last_active_date: today });
-          Alert.alert('Streak frozen! 🧊', 'Your streak is protected for today.');
+          streakAlert('Streak frozen! 🧊', 'Your streak is protected for today.');
         }},
       ]
     );

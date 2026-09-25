@@ -86,9 +86,16 @@ export default function QuickStartScreen() {
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState(0);
   const [showComplete, setShowComplete] = useState(false);
+  const [demoPaused, setDemoPaused] = useState(false);
+  const [voiceMuted, setVoiceMuted] = useState(false);
 
   const workoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const voiceMutedRef = useRef(false);
+
+  const speakWorkout = useCallback((text: string) => {
+    if (!voiceMutedRef.current) speak(text);
+  }, [speak]);
 
   const initState = useCallback(() => {
     const cat: ExerciseCategory = route.params?.category ?? DEFAULT_CATEGORY;
@@ -174,22 +181,23 @@ export default function QuickStartScreen() {
 
     if (!workoutStarted) {
       setWorkoutStarted(true);
-      speak(`Starting ${catMeta?.label || category} workout. Let's go!`);
+      speakWorkout(`Starting ${catMeta?.label || category} workout. Let's go!`);
       workoutTimerRef.current = setInterval(() => setWorkoutSeconds(p => p + 1), 1000);
     }
 
     setActiveIndex(index);
+    setDemoPaused(false);
     const ex = exercises[index];
     setExerciseSecondsLeft(ex.duration || 0);
 
     if (isAiWorkout && ex.sets && ex.reps) {
-      speak(`Starting ${ex.name}. ${ex.sets} sets of ${ex.reps}.`);
+      speakWorkout(`Starting ${ex.name}. ${ex.sets} sets of ${ex.reps}.`);
     } else if (ex.duration > 0) {
-      speak(`Starting ${ex.name}. ${ex.duration} seconds. Go!`);
+      speakWorkout(`Starting ${ex.name}. ${ex.duration} seconds. Go!`);
       exerciseTimerRef.current = setInterval(() => {
         setExerciseSecondsLeft(prev => {
-          if (prev === SPEAK_TRIGGER.TEN_LEFT) speak('Ten seconds left! Push through!');
-          if (prev === SPEAK_TRIGGER.FIVE_FOUR) speak('5, 4, 3, 2, 1');
+          if (prev === SPEAK_TRIGGER.TEN_LEFT) speakWorkout('Ten seconds left! Push through!');
+          if (prev === SPEAK_TRIGGER.FIVE_FOUR) speakWorkout('5, 4, 3, 2, 1');
           if (prev <= 1) {
             clearInterval(exerciseTimerRef.current!);
             completeExercise(index);
@@ -214,11 +222,11 @@ export default function QuickStartScreen() {
 
     const nextIndex = index + 1;
     if (nextIndex < exercises.length) {
-      speak(`${exercises[index].name} complete! Next up: ${exercises[nextIndex].name} in 3 seconds.`);
+      speakWorkout(`${exercises[index].name} complete! Next up: ${exercises[nextIndex].name} in 3 seconds.`);
       setTimeout(() => startExercise(nextIndex), 3000);
     } else {
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
-      speak('All exercises complete! Great work!');
+      speakWorkout('All exercises complete! Great work!');
       setShowComplete(true);
     }
   };
@@ -311,13 +319,43 @@ export default function QuickStartScreen() {
         </View>
       </View>
 
+      {(workoutStarted || activeIndex >= 0) && (
+        <View style={[styles.mediaControls, { marginHorizontal: spacing.lg, marginBottom: spacing.sm }]}>
+          <TouchableOpacity
+            onPress={() => {
+              stopSpeech();
+              voiceMutedRef.current = !voiceMutedRef.current;
+              setVoiceMuted(voiceMutedRef.current);
+            }}
+            style={[styles.mediaBtn, { borderColor: theme.border, backgroundColor: voiceMuted ? theme.border : theme.card }]}
+          >
+            <Ionicons name={voiceMuted ? 'volume-mute' : 'stop-circle'} size={18} color={voiceMuted ? theme.textMuted : '#FF5959'} />
+            <Text style={[styles.mediaBtnText, { color: theme.textPrimary }]}>
+              {voiceMuted ? 'Voice off' : 'Stop voice'}
+            </Text>
+          </TouchableOpacity>
+          {activeExercise && activeExerciseData && !isAiWorkout ? (
+            <TouchableOpacity
+              onPress={() => setDemoPaused((p) => !p)}
+              style={[styles.mediaBtn, { borderColor: theme.border, backgroundColor: demoPaused ? theme.border : theme.card }]}
+            >
+              <Ionicons name={demoPaused ? 'play-circle' : 'pause-circle'} size={18} color={catColor} />
+              <Text style={[styles.mediaBtnText, { color: theme.textPrimary }]}>
+                {demoPaused ? 'Resume demo' : 'Pause demo'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Active exercise banner */}
         {activeExercise && activeExerciseData && !isAiWorkout && (
           <AnimatedExerciseDemo
             exercise={activeExerciseData}
-            isActive={activeIndex >= 0}
+            isActive={activeIndex >= 0 && !demoPaused}
             secondsLeft={exerciseSecondsLeft}
+            onStopDemo={() => setDemoPaused(true)}
           />
         )}
         {activeExercise && isAiWorkout && (
@@ -506,6 +544,18 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', borderRadius: 2 },
 
   statsRow: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.sm, borderRadius: 14, borderWidth: 1 },
+  mediaControls: { flexDirection: 'row', gap: spacing.sm },
+  mediaBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  mediaBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
   statItem: { flex: 1, alignItems: 'center', gap: 2 },
   statDivider: { width: 1, marginVertical: 4 },
   statValue: { fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },

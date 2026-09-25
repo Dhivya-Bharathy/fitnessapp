@@ -3,6 +3,14 @@ const palette = {
   green400: '#34D98A',
   green500: '#2DDC8C',
   green600: '#0DAE6C',
+  /** Gym-style neon lime (active nav, highlights) */
+  neonLime: '#C8FF00',
+  neonLimeDim: 'rgba(200,255,0,0.14)',
+  gymCharcoal: '#121212',
+  gymSurface: '#1A1A1A',
+  gymCard: '#1E1E1E',
+  gymBorder: '#2C2C2C',
+  gymMuted: '#8E8E93',
   green900: '#065F46',
 
   // ── Indigo / navy (hero card, dark surfaces) ───────────────

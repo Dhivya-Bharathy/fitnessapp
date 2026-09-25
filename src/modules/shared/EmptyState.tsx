@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   btn: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     marginTop: spacing.sm,
   },
   btnText: { fontSize: fontSize.base, fontWeight: '700' },

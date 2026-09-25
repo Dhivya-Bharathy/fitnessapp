@@ -28,13 +28,13 @@ export const shadow = {
 
   accent: Platform.select({
     ios: {
-      shadowColor:   '#2DDC8C',
+      shadowColor:   '#C8FF00',
       shadowOffset:  { width: 0, height: 4 },
       shadowOpacity: 0.30,
       shadowRadius:  12,
     },
     android: { elevation: 6 },
-    web: { boxShadow: '0 4px 12px rgba(45,220,140,0.30)' },
+    web: { boxShadow: '0 4px 16px rgba(200,255,0,0.28)' },
   }),
 
   subtle: Platform.select({
@@ -63,11 +63,11 @@ export const spacing = {
 };
 
 export const radius = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 28,
+  xs: 6,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
   full: 9999,
 };
